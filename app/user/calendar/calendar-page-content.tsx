@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import { ChevronLeft, ChevronRight, Download } from "lucide-react"
 import { Button } from "@/components/ui"
 import { formatTime12 } from "@/lib/format-time"
-import { calcWorkMinutes, formatTotalWithOvertime } from "@/lib/time-calc"
+import { calcWorkMinutes, formatMinutesAsHours, formatTotalWithOvertime } from "@/lib/time-calc"
 import { deriveAttendanceStatus, type AttendanceStatus } from "@/lib/attendance-status"
 import { generateCalendarPdf, type AttendanceExportRow, type ExportSummary } from "@/lib/calendar-pdf"
 import { UserPageLayout } from "@/components/user/user-page-layout"
@@ -434,6 +434,36 @@ export const UserCalendarPageContent = () => {
     return `${t.getFullYear()}-${t.getMonth()}-${t.getDate()}`
   }, [])
 
+  const totalRegularMinutes = useMemo(() => {
+    let sum = 0
+    for (const { date, isCurrentMonth } of calendarDays) {
+      if (!isCurrentMonth) continue
+      const dateStr = toDateStr(date)
+      const dayOfWeek = date.getDay()
+      const schedule =
+        scheduleByDate.get(dateStr) ?? scheduleByDay.get(dayOfWeek)
+      const existingAttendance = attendanceByDate.get(dateStr)
+      if (
+        schedule &&
+        existingAttendance?.timeIn &&
+        existingAttendance?.timeOut
+      ) {
+        const actualM = calcWorkMinutes(
+          existingAttendance.timeIn,
+          existingAttendance.timeOut,
+          schedule.breakDuration ?? 0
+        )
+        const scheduledM = calcWorkMinutes(
+          schedule.timeIn,
+          schedule.timeOut,
+          schedule.breakDuration ?? 0
+        )
+        sum += Math.min(actualM, scheduledM)
+      }
+    }
+    return sum
+  }, [calendarDays, scheduleByDay, scheduleByDate, attendanceByDate])
+
   if (isLoading && !me) {
     return (
       <UserPageLayout
@@ -470,6 +500,16 @@ export const UserCalendarPageContent = () => {
       showUserDetails={true}
     >
       <div className="space-y-6">
+        {totalRegularMinutes > 0 && (
+          <div className="flex flex-row items-center justify-between gap-4 rounded-xl border border-zinc-200/80 bg-zinc-50/50 px-4 py-3 dark:border-zinc-700/80 dark:bg-zinc-800/30">
+            <p className="text-sm font-medium text-zinc-600 dark:text-zinc-400">
+              Total hours this month
+            </p>
+            <p className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
+              {formatMinutesAsHours(totalRegularMinutes)}
+            </p>
+          </div>
+        )}
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-1 rounded-xl border border-zinc-200/80 bg-zinc-50/50 p-1 dark:border-zinc-700/80 dark:bg-zinc-800/50">
             <Button
