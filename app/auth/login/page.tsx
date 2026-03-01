@@ -1,0 +1,11 @@
+import type { Metadata } from "next"
+import { LoginPageContent } from "./login-page-content"
+
+export const metadata: Metadata = {
+  title: "Sign in | Attendance",
+  description: "Sign in to your attendance account",
+}
+
+export default function LoginPage() {
+  return <LoginPageContent />
+}

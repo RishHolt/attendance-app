@@ -1,0 +1,11 @@
+{"sessionId":"f2a8d4","location":"middleware.ts","message":"middleware getUser","data":{"path":"/auth/login","hasUser":true,"cookieCount":3},"timestamp":1772370059619,"hypothesisId":"H4"}
+{"sessionId":"f2a8d4","location":"middleware.ts","message":"middleware getUser","data":{"path":"/auth/login","hasUser":true,"cookieCount":3},"timestamp":1772370059795,"hypothesisId":"H4"}
+{"sessionId":"f2a8d4","location":"middleware.ts","message":"middleware getUser","data":{"path":"/api/auth/login","hasUser":true,"cookieCount":3},"timestamp":1772370077567,"hypothesisId":"H4"}
+{"sessionId":"f2a8d4","location":"login/route.ts","message":"login API received","data":{"login":"***","hasPassword":true},"timestamp":1772370077611,"hypothesisId":"H5"}
+{"sessionId":"f2a8d4","location":"login/route.ts","message":"signInWithPassword success","data":{"email":"admin@example.com","hasSession":true},"timestamp":1772370077846,"hypothesisId":"H1"}
+{"sessionId":"f2a8d4","location":"login/route.ts","message":"redirecting","data":{"to":"/admin"},"timestamp":1772370077846,"hypothesisId":"H2"}
+{"sessionId":"f2a8d4","location":"middleware.ts","message":"middleware getUser","data":{"path":"/admin","hasUser":true,"cookieCount":3},"timestamp":1772370077999,"hypothesisId":"H4"}
+{"sessionId":"f2a8d4","location":"admin/layout.tsx","message":"admin getUser","data":{"hasUser":true,"sbCookieCount":1},"timestamp":1772370078346,"hypothesisId":"H3"}
+{"sessionId":"f2a8d4","location":"middleware.ts","message":"middleware getUser","data":{"path":"/admin","hasUser":true,"cookieCount":3},"timestamp":1772370081527,"hypothesisId":"H4"}
+{"sessionId":"f2a8d4","location":"admin/layout.tsx","message":"admin getUser","data":{"hasUser":true,"sbCookieCount":1},"timestamp":1772370081685,"hypothesisId":"H3"}
+{"sessionId":"f2a8d4","location":"middleware.ts","message":"middleware getUser","data":{"path":"/.well-known/appspecific/com.chrome.devtools.json","hasUser":true,"cookieCount":3},"timestamp":1772370084115,"hypothesisId":"H4"}
