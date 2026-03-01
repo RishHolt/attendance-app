@@ -1,12 +1,14 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
-import { ChevronLeft, ChevronRight } from "lucide-react"
+import { useCallback, useEffect, useMemo, useState } from "react"
+import { ChevronLeft, ChevronRight, Download } from "lucide-react"
 import { Button } from "@/components/ui"
 import { formatTime12 } from "@/lib/format-time"
 import { calcWorkMinutes, formatTotalWithOvertime } from "@/lib/time-calc"
 import { deriveAttendanceStatus, type AttendanceStatus } from "@/lib/attendance-status"
+import { generateCalendarPdf, type AttendanceExportRow, type ExportSummary } from "@/lib/calendar-pdf"
 import { UserPageLayout } from "@/components/user/user-page-layout"
+import { ExportPdfModal } from "@/app/admin/calendar/export-pdf-modal"
 
 type MeUser = {
   id: string
@@ -99,6 +101,8 @@ export const UserCalendarPageContent = () => {
   const [currentDate, setCurrentDate] = useState(() => new Date())
   const [isLoading, setIsLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
+  const [exportPdfModalOpen, setExportPdfModalOpen] = useState(false)
+  const [isExporting, setIsExporting] = useState(false)
 
   useEffect(() => {
     const loadMe = async () => {
@@ -221,6 +225,210 @@ export const UserCalendarPageContent = () => {
     setCurrentDate((d) => new Date(d.getFullYear(), d.getMonth() + 1))
   }
 
+  const handleExportPdf = useCallback(
+    async (opts: {
+      mode: "month" | "custom"
+      dateStart?: string
+      dateEnd?: string
+      supervisorName: string
+      supervisorPosition: string
+    }) => {
+      if (!me) return
+      setIsExporting(true)
+      try {
+        const year = currentDate.getFullYear()
+        const month = currentDate.getMonth()
+        let daysToExport: Date[]
+        let periodLabel: string
+        let attList: AttendanceRow[]
+
+        if (opts.mode === "custom" && opts.dateStart && opts.dateEnd) {
+          attList = await fetchAttendances(me.id, opts.dateStart, opts.dateEnd)
+          const start = new Date(opts.dateStart + "T00:00:00")
+          const end = new Date(opts.dateEnd + "T23:59:59")
+          daysToExport = []
+          const cur = new Date(start)
+          while (cur <= end) {
+            daysToExport.push(new Date(cur))
+            cur.setDate(cur.getDate() + 1)
+          }
+          periodLabel = `${start.toLocaleDateString("en-US", {
+            month: "short",
+            day: "numeric",
+            year: "numeric",
+          })} - ${end.toLocaleDateString("en-US", {
+            month: "short",
+            day: "numeric",
+            year: "numeric",
+          })}`
+        } else {
+          attList = attendances
+          const last = new Date(year, month + 1, 0)
+          const daysInMonth = last.getDate()
+          daysToExport = []
+          for (let d = 1; d <= daysInMonth; d++) {
+            daysToExport.push(new Date(year, month, d))
+          }
+          periodLabel = currentDate.toLocaleDateString("en-US", {
+            month: "long",
+            year: "numeric",
+          })
+        }
+
+        const exportAttendanceByDate = new Map(attList.map((a) => [a.date, a]))
+
+        const today = new Date()
+        const todayStr = toDateStr(today)
+        const tomorrow = new Date(today)
+        tomorrow.setDate(tomorrow.getDate() + 1)
+        const tomorrowStr = toDateStr(tomorrow)
+
+        const rows: AttendanceExportRow[] = daysToExport.map((date) => {
+          const dateStr = toDateStr(date)
+          const dayOfWeek = date.getDay()
+          const schedule =
+            scheduleByDate.get(dateStr) ?? scheduleByDay.get(dayOfWeek)
+          const hasSchedule = !!schedule
+          const existingAttendance = exportAttendanceByDate.get(dateStr)
+          const status = hasSchedule
+            ? deriveAttendanceStatus({
+                hasSchedule: true,
+                hasTimeIn: !!existingAttendance?.timeIn,
+                scheduledTimeIn: schedule.timeIn,
+                actualTimeIn: existingAttendance?.timeIn ?? null,
+                dateStr,
+                todayStr,
+                tomorrowStr,
+                startDateStr: me.startDate ?? null,
+              })
+            : "no-schedule"
+          const statusLabel =
+            status === "no-schedule"
+              ? "No schedule"
+              : status.charAt(0).toUpperCase() + status.slice(1)
+          const timeIn = existingAttendance?.timeIn
+            ? formatTime12(existingAttendance.timeIn)
+            : ""
+          const timeOut = existingAttendance?.timeOut
+            ? formatTime12(existingAttendance.timeOut)
+            : ""
+          const scheduledMinutes = schedule
+            ? calcWorkMinutes(
+                schedule.timeIn,
+                schedule.timeOut,
+                schedule.breakDuration ?? 0
+              )
+            : 0
+          const totalMinutes =
+            existingAttendance?.timeIn &&
+            existingAttendance?.timeOut &&
+            schedule
+              ? calcWorkMinutes(
+                  existingAttendance.timeIn,
+                  existingAttendance.timeOut,
+                  schedule.breakDuration ?? 0
+                )
+              : 0
+          const total =
+            totalMinutes > 0 && scheduledMinutes > 0
+              ? formatTotalWithOvertime(totalMinutes, scheduledMinutes)
+              : ""
+          const dateDisplay =
+            opts.mode === "month" && daysToExport.length > 14
+              ? date.toLocaleDateString("en-US", {
+                  weekday: "short",
+                  month: "short",
+                  day: "numeric",
+                })
+              : date.toLocaleDateString("en-US", {
+                  weekday: "short",
+                  month: "short",
+                  day: "numeric",
+                  year: "numeric",
+                })
+          return {
+            dateDisplay,
+            timeIn,
+            timeOut,
+            status: statusLabel,
+            total,
+            totalMinutes,
+          }
+        })
+
+        let totalRegular = 0
+        let totalOvertime = 0
+        let totalPresent = 0
+        let totalLate = 0
+        let totalAbsent = 0
+
+        for (const row of rows) {
+          if (row.status === "Present") totalPresent++
+          if (row.status === "Late") totalLate++
+          if (row.status === "Absent") totalAbsent++
+        }
+
+        for (const date of daysToExport) {
+          const dateStr = toDateStr(date)
+          const dayOfWeek = date.getDay()
+          const schedule =
+            scheduleByDate.get(dateStr) ?? scheduleByDay.get(dayOfWeek)
+          const existingAttendance = exportAttendanceByDate.get(dateStr)
+          if (
+            schedule &&
+            existingAttendance?.timeIn &&
+            existingAttendance?.timeOut
+          ) {
+            const actualM = calcWorkMinutes(
+              existingAttendance.timeIn,
+              existingAttendance.timeOut,
+              schedule.breakDuration ?? 0
+            )
+            const scheduledM = calcWorkMinutes(
+              schedule.timeIn,
+              schedule.timeOut,
+              schedule.breakDuration ?? 0
+            )
+            totalRegular += Math.min(actualM, scheduledM)
+            if (actualM > scheduledM) totalOvertime += actualM - scheduledM
+          }
+        }
+
+        const summary: ExportSummary = {
+          totalHours: totalRegular,
+          totalOvertime,
+          totalPresent,
+          totalLate,
+          totalAbsent,
+        }
+
+        const pdfBytes = await generateCalendarPdf({
+          userName: me.fullName,
+          periodLabel,
+          rows,
+          summary,
+          supervisorName: opts.supervisorName,
+          supervisorPosition: opts.supervisorPosition,
+        })
+        const blob = new Blob(
+          [
+            pdfBytes.buffer.slice(
+              pdfBytes.byteOffset,
+              pdfBytes.byteOffset + pdfBytes.byteLength
+            ) as ArrayBuffer,
+          ],
+          { type: "application/pdf" }
+        )
+        const url = URL.createObjectURL(blob)
+        window.open(url, "_blank")
+        setTimeout(() => URL.revokeObjectURL(url), 1000)
+      } finally {
+        setIsExporting(false)
+      }
+    },
+    [me, currentDate, scheduleByDay, scheduleByDate, attendances]
+  )
+
   const todayKey = useMemo(() => {
     const t = new Date()
     return `${t.getFullYear()}-${t.getMonth()}-${t.getDate()}`
@@ -288,6 +496,15 @@ export const UserCalendarPageContent = () => {
               <ChevronRight className="h-5 w-5" />
             </Button>
           </div>
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            onClick={() => setExportPdfModalOpen(true)}
+            leftIcon={<Download className="h-4 w-4" />}
+          >
+            View Report
+          </Button>
         </div>
 
         <div className="overflow-x-auto rounded-2xl border border-zinc-200/80 bg-white shadow-sm dark:border-zinc-800/80 dark:bg-zinc-900 dark:shadow-zinc-950/30">
@@ -502,6 +719,14 @@ export const UserCalendarPageContent = () => {
           </div>
         </div>
       </div>
+
+      <ExportPdfModal
+        open={exportPdfModalOpen}
+        onClose={() => setExportPdfModalOpen(false)}
+        onExport={handleExportPdf}
+        currentMonthLabel={monthLabel}
+        disabled={isExporting}
+      />
     </UserPageLayout>
   )
 }

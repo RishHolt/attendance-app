@@ -158,7 +158,15 @@ export const QrAttendanceModal = ({ open, onClose }: QrAttendanceModalProps) => 
       )
 
       const pdfBytes = await pdfDoc.save()
-      const blob = new Blob([pdfBytes], { type: "application/pdf" })
+      const blob = new Blob(
+        [
+          pdfBytes.buffer.slice(
+            pdfBytes.byteOffset,
+            pdfBytes.byteOffset + pdfBytes.byteLength
+          ) as ArrayBuffer,
+        ],
+        { type: "application/pdf" }
+      )
       const link = document.createElement("a")
       link.href = URL.createObjectURL(blob)
       link.download = `qr-attendance-${new Date().toISOString().slice(0, 10)}.pdf`
