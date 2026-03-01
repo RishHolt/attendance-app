@@ -12,6 +12,7 @@ import {
   validateUsername,
   validateContactNo,
   validatePassword,
+  validatePosition,
   validateUserForm,
 } from "@/lib/user-form-validation"
 import { checkUserAvailability } from "@/lib/check-user-availability"
@@ -86,14 +87,14 @@ export const EditUserModal = ({
     return null
   }
 
-  const getFieldError = (field: "fullName" | "email" | "username" | "contactNo" | "password" | "confirmPassword") => {
+  const getFieldError = (field: "fullName" | "email" | "username" | "contactNo" | "position" | "password" | "confirmPassword") => {
     if (serverErrorField === field) return serverErrorMessage
     if (availabilityErrors[field]) return availabilityErrors[field]
     return fieldErrors[field] ?? undefined
   }
 
   const validateField = (
-    field: "fullName" | "email" | "username" | "contactNo" | "password" | "confirmPassword",
+    field: "fullName" | "email" | "username" | "contactNo" | "position" | "password" | "confirmPassword",
     value: string,
     confirmValue?: string
   ) => {
@@ -102,6 +103,7 @@ export const EditUserModal = ({
     else if (field === "email") err = validateEmail(value)
     else if (field === "username") err = validateUsername(value)
     else if (field === "contactNo") err = validateContactNo(value)
+    else if (field === "position") err = validatePosition(value)
     else if (field === "password") err = value ? validatePassword(value) : null
     else if (field === "confirmPassword")
       err = value !== (confirmValue ?? password) ? "Passwords do not match" : null
@@ -235,7 +237,7 @@ export const EditUserModal = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!user) return
-    const validationErrors = validateUserForm({ fullName, email, username, contactNo })
+    const validationErrors = validateUserForm({ fullName, email, username, contactNo, position })
     if (password || confirmPassword) {
       if (!password || !confirmPassword) {
         validationErrors.password = "Enter both password fields to change password"
@@ -375,7 +377,13 @@ export const EditUserModal = ({
           label="Position"
           placeholder="e.g. Developer, Manager"
           value={position}
-          onChange={(e) => setPosition(e.target.value)}
+          onChange={(e) => {
+            setPosition(e.target.value)
+            validateField("position", e.target.value)
+          }}
+          onBlur={(e) => validateField("position", e.target.value)}
+          required
+          error={getFieldError("position")}
         />
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
           <PasswordInput
