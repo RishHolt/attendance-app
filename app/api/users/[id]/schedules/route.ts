@@ -87,7 +87,8 @@ export async function GET(
             : null,
       }
     } else if (recurring.length > 0) {
-      const counts = new Map<string, { count: number; t: typeof defaultTemplate }>()
+      type Template = { timeIn: string; timeOut: string; breakTime: string | null; breakDuration: number | null }
+      const counts = new Map<string, { count: number; t: Template }>()
       for (const r of recurring) {
         const t = {
           timeIn: r.timeIn,
