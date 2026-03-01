@@ -475,10 +475,11 @@ export const AnalyticsPageContent = () => {
                         ))}
                       </Pie>
                       <Tooltip
-                        formatter={(value: number, name: string, props: { payload: { value: number } }) => {
+                        formatter={(value: number | undefined, name: string) => {
+                          const numValue = value ?? 0
                           const total = pieData.reduce((s, d) => s + d.value, 0)
-                          const pct = total > 0 ? Math.round((value / total) * 100) : 0
-                          return [`${value} (${pct}%)`, name]
+                          const pct = total > 0 ? Math.round((numValue / total) * 100) : 0
+                          return [`${numValue} (${pct}%)`, name]
                         }}
                       />
                     </PieChart>
