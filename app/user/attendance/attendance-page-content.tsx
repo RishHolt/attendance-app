@@ -6,6 +6,7 @@ import { Button, Pagination } from "@/components/ui"
 import { UserPageLayout } from "@/components/user/user-page-layout"
 import { formatTime12 } from "@/lib/format-time"
 import { swal } from "@/lib/swal"
+import { isLate } from "@/lib/time-calc"
 
 type MeUser = {
   id: string
@@ -29,6 +30,43 @@ type AttendanceRow = {
 type ScheduleForDay = {
   timeIn: string
   timeOut: string
+}
+
+type ScheduleRow = {
+  dayOfWeek: number | null
+  customDate: string | null
+  timeIn: string
+  timeOut: string
+}
+
+type DisplayStatus = "present" | "late" | "absent"
+
+const computeDisplayStatusForRow = (
+  row: AttendanceRow,
+  schedules: ScheduleRow[]
+): DisplayStatus => {
+  if (row.status === "absent") return "absent"
+  if (row.status === "late") return "late"
+
+  if (!row.timeIn || schedules.length === 0) {
+    return row.status === "present" ? "present" : "absent"
+  }
+
+  const date = new Date(row.date + "T00:00:00")
+  if (Number.isNaN(date.getTime())) {
+    return row.status === "present" ? "present" : "absent"
+  }
+
+  const dayOfWeek = date.getDay()
+  const schedule =
+    schedules.find((s) => s.customDate === row.date) ??
+    schedules.find((s) => s.customDate == null && s.dayOfWeek === dayOfWeek)
+
+  if (!schedule) {
+    return row.status === "present" ? "present" : "absent"
+  }
+
+  return isLate(row.timeIn, schedule.timeIn) ? "late" : "present"
 }
 
 const getTodayISO = () => {
@@ -55,6 +93,7 @@ export const AttendancePageContent = () => {
   })
   const [attendancePage, setAttendancePage] = useState(1)
   const [todaySchedule, setTodaySchedule] = useState<ScheduleForDay | null>(null)
+  const [schedules, setSchedules] = useState<ScheduleRow[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [isClockInLoading, setIsClockInLoading] = useState(false)
@@ -105,37 +144,20 @@ export const AttendancePageContent = () => {
         setAttendance(null)
       }
 
-      if (attListRes.ok) {
-        const data = await attListRes.json()
-        const list = data?.rows ?? (Array.isArray(data) ? data : [])
-        setAttendanceList(list)
-        setAttendanceTotal(data?.total ?? list.length)
-        setAttendanceStats(
-          data?.stats ?? {
-            present: list.filter((r: AttendanceRow) => r.status === "present").length,
-            late: list.filter((r: AttendanceRow) => r.status === "late").length,
-            absent: list.filter((r: AttendanceRow) => r.status === "absent").length,
-          }
-        )
-      } else {
-        setAttendanceList([])
-        setAttendanceTotal(0)
-        setAttendanceStats({ present: 0, late: 0, absent: 0 })
-      }
+      let scheduleRows: ScheduleRow[] = []
 
       if (schedRes.ok) {
         const schedData = await schedRes.json()
-        const rows = schedData.rows ?? []
+        const rows = (schedData.rows ?? []) as ScheduleRow[]
+        scheduleRows = rows
+        setSchedules(rows)
+
         const todayDate = new Date()
         const dayOfWeek = todayDate.getDay()
         const todayStr = todayDate.toISOString().split("T")[0]
 
-        const customMatch = rows.find(
-          (r: { customDate: string | null }) => r.customDate === todayStr
-        )
-        const recurringMatch = rows.find(
-          (r: { dayOfWeek: number | null }) => r.dayOfWeek === dayOfWeek
-        )
+        const customMatch = rows.find((r) => r.customDate === todayStr)
+        const recurringMatch = rows.find((r) => r.customDate == null && r.dayOfWeek === dayOfWeek)
         const match = customMatch ?? recurringMatch
         if (match) {
           setTodaySchedule({
@@ -146,7 +168,31 @@ export const AttendancePageContent = () => {
           setTodaySchedule(null)
         }
       } else {
+        setSchedules([])
         setTodaySchedule(null)
+      }
+
+      if (attListRes.ok) {
+        const data = await attListRes.json()
+        const list = (data?.rows ?? (Array.isArray(data) ? data : [])) as AttendanceRow[]
+        setAttendanceList(list)
+        setAttendanceTotal(data?.total ?? list.length)
+
+        const statsFromList = list.reduce(
+          (acc, row) => {
+            const displayStatus = computeDisplayStatusForRow(row, scheduleRows)
+            if (displayStatus === "present") acc.present += 1
+            else if (displayStatus === "late") acc.late += 1
+            else acc.absent += 1
+            return acc
+          },
+          { present: 0, late: 0, absent: 0 }
+        )
+        setAttendanceStats(statsFromList)
+      } else {
+        setAttendanceList([])
+        setAttendanceTotal(0)
+        setAttendanceStats({ present: 0, late: 0, absent: 0 })
       }
     } catch {
       setLoadError("Failed to load attendance")
@@ -465,86 +511,92 @@ export const AttendancePageContent = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {attendanceList.map((row) => (
-                    <tr
-                      key={row.id}
-                      className="border-b border-zinc-100 dark:border-zinc-800/50 last:border-0"
-                    >
-                      <td className="py-3 pr-4 text-sm text-zinc-900 dark:text-zinc-100">
+                  {attendanceList.map((row) => {
+                    const displayStatus = computeDisplayStatusForRow(row, schedules)
+                    return (
+                      <tr
+                        key={row.id}
+                        className="border-b border-zinc-100 dark:border-zinc-800/50 last:border-0"
+                      >
+                        <td className="py-3 pr-4 text-sm text-zinc-900 dark:text-zinc-100">
+                          {new Date(row.date + "T00:00:00").toLocaleDateString(undefined, {
+                            weekday: "short",
+                            month: "short",
+                            day: "numeric",
+                            year: "numeric",
+                          })}
+                        </td>
+                        <td className="py-3 pr-4">
+                          <span
+                            className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium capitalize ${
+                              displayStatus === "present"
+                                ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400"
+                                : displayStatus === "late"
+                                  ? "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400"
+                                  : "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400"
+                            }`}
+                          >
+                            {displayStatus}
+                          </span>
+                        </td>
+                        <td className="py-3 pr-4 text-sm text-zinc-600 dark:text-zinc-400">
+                          {row.timeIn ? formatTime12(row.timeIn) : "—"}
+                        </td>
+                        <td className="py-3 pr-4 text-sm text-zinc-600 dark:text-zinc-400">
+                          {row.timeOut ? formatTime12(row.timeOut) : "—"}
+                        </td>
+                        <td className="py-3 text-sm text-zinc-600 dark:text-zinc-400 max-w-[180px]">
+                          {row.approvalStatus === "denied" && row.remarks
+                            ? row.remarks
+                            : "—"}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+            <div className="space-y-3 sm:hidden">
+              {attendanceList.map((row) => {
+                const displayStatus = computeDisplayStatusForRow(row, schedules)
+                return (
+                  <div
+                    key={row.id}
+                    className="rounded-xl border border-zinc-200 bg-zinc-50/50 p-4 dark:border-zinc-800 dark:bg-zinc-800/30"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="font-medium text-zinc-900 dark:text-zinc-100">
                         {new Date(row.date + "T00:00:00").toLocaleDateString(undefined, {
                           weekday: "short",
                           month: "short",
                           day: "numeric",
                           year: "numeric",
                         })}
-                      </td>
-                      <td className="py-3 pr-4">
-                        <span
-                          className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium capitalize ${
-                            row.status === "present"
-                              ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400"
-                              : row.status === "late"
-                                ? "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400"
-                                : "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400"
-                          }`}
-                        >
-                          {row.status}
-                        </span>
-                      </td>
-                      <td className="py-3 pr-4 text-sm text-zinc-600 dark:text-zinc-400">
-                        {row.timeIn ? formatTime12(row.timeIn) : "—"}
-                      </td>
-                      <td className="py-3 pr-4 text-sm text-zinc-600 dark:text-zinc-400">
-                        {row.timeOut ? formatTime12(row.timeOut) : "—"}
-                      </td>
-                      <td className="py-3 text-sm text-zinc-600 dark:text-zinc-400 max-w-[180px]">
-                        {row.approvalStatus === "denied" && row.remarks
-                          ? row.remarks
-                          : "—"}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <div className="space-y-3 sm:hidden">
-              {attendanceList.map((row) => (
-                <div
-                  key={row.id}
-                  className="rounded-xl border border-zinc-200 bg-zinc-50/50 p-4 dark:border-zinc-800 dark:bg-zinc-800/30"
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="font-medium text-zinc-900 dark:text-zinc-100">
-                      {new Date(row.date + "T00:00:00").toLocaleDateString(undefined, {
-                        weekday: "short",
-                        month: "short",
-                        day: "numeric",
-                        year: "numeric",
-                      })}
+                      </p>
+                      <span
+                        className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium capitalize shrink-0 ${
+                          displayStatus === "present"
+                            ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400"
+                            : displayStatus === "late"
+                              ? "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400"
+                              : "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400"
+                        }`}
+                      >
+                        {displayStatus}
+                      </span>
+                    </div>
+                    <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
+                      {row.timeIn ? formatTime12(row.timeIn) : "—"} –{" "}
+                      {row.timeOut ? formatTime12(row.timeOut) : "—"}
                     </p>
-                    <span
-                      className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium capitalize shrink-0 ${
-                        row.status === "present"
-                          ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400"
-                          : row.status === "late"
-                            ? "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400"
-                            : "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400"
-                      }`}
-                    >
-                      {row.status}
-                    </span>
+                    {row.approvalStatus === "denied" && row.remarks && (
+                      <p className="mt-2 text-xs text-zinc-600 dark:text-zinc-400">
+                        Remarks: {row.remarks}
+                      </p>
+                    )}
                   </div>
-                  <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-                    {row.timeIn ? formatTime12(row.timeIn) : "—"} –{" "}
-                    {row.timeOut ? formatTime12(row.timeOut) : "—"}
-                  </p>
-                  {row.approvalStatus === "denied" && row.remarks && (
-                    <p className="mt-2 text-xs text-zinc-600 dark:text-zinc-400">
-                      Remarks: {row.remarks}
-                    </p>
-                  )}
-                </div>
-              ))}
+                )
+              })}
             </div>
             {attendanceTotal > 0 && (
               <div className="mt-6 pt-6 border-t border-zinc-200 dark:border-zinc-800">
