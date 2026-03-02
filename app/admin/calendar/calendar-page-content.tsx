@@ -639,7 +639,7 @@ export const CalendarPageContent = () => {
 
       <Card variant="default" padding="md">
         {selectedUserId && totalRegularMinutes > 0 && (
-          <div className="mb-6 flex flex-row items-center justify-between gap-4 rounded-xl border border-zinc-200/80 bg-zinc-50/50 px-4 py-3 dark:border-zinc-700/80 dark:bg-zinc-800/30">
+          <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-4 rounded-xl border border-zinc-200/80 bg-zinc-50/50 px-4 py-3 dark:border-zinc-700/80 dark:bg-zinc-800/30">
             <p className="text-sm font-medium text-zinc-600 dark:text-zinc-400">
               Total hours this month
             </p>
@@ -648,20 +648,23 @@ export const CalendarPageContent = () => {
             </p>
           </div>
         )}
-        <div className="flex sm:flex-row flex-col sm:justify-between sm:items-center gap-6">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-6">
-            <div className="flex sm:flex-row flex-col sm:items-center gap-2 sm:gap-4">
-              <label htmlFor="calendar-user-select" className="flex items-center gap-2 font-medium text-zinc-700 dark:text-zinc-300 text-sm">
+        <div className="flex flex-col gap-4 sm:gap-6 sm:flex-row sm:justify-between sm:items-center">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-6 w-full sm:w-auto">
+            <div className="flex flex-col gap-2 w-full sm:w-auto sm:min-w-[200px]">
+              <label
+                htmlFor="calendar-user-select"
+                className="flex items-center gap-2 font-medium text-zinc-700 dark:text-zinc-300 text-sm shrink-0"
+              >
                 <User className="w-4 h-4 shrink-0" aria-hidden />
                 Select user
               </label>
-              <div className="relative flex min-w-[200px]">
+              <div className="relative w-full sm:min-w-[200px]">
                 <select
                   id="calendar-user-select"
                   value={selectedUserId}
                   onChange={(e) => setSelectedUserId(e.target.value)}
                   disabled={isLoadingUsers}
-                  className="h-11 w-full appearance-none rounded-xl border border-zinc-200/80 bg-white pl-4 pr-12 py-2 text-sm font-medium text-zinc-900 transition-colors focus:border-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-400/20 disabled:opacity-50 dark:border-zinc-700/80 dark:bg-zinc-800/50 dark:text-zinc-100 dark:focus:border-zinc-500"
+                  className="h-11 w-full min-h-[44px] appearance-none rounded-xl border border-zinc-200/80 bg-white pl-4 pr-12 py-2 text-sm font-medium text-zinc-900 transition-colors focus:border-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-400/20 disabled:opacity-50 dark:border-zinc-700/80 dark:bg-zinc-800/50 dark:text-zinc-100 dark:focus:border-zinc-500"
                   aria-label="Select user"
                 >
                   <option value="">
@@ -684,52 +687,58 @@ export const CalendarPageContent = () => {
               if (!u) return null
               const extras = [u.position, u.userId && `ID: ${u.userId}`].filter(Boolean).join(" • ")
               return (
-                <div className="flex flex-col sm:flex-row sm:items-baseline gap-1 sm:gap-3 text-sm text-zinc-600 dark:text-zinc-400">
-                  <span className="truncate">{u.email}</span>
+                <div className="flex flex-col gap-0.5 sm:flex-row sm:items-baseline sm:gap-3 text-sm text-zinc-600 dark:text-zinc-400 min-w-0">
+                  <span className="truncate" title={u.email}>
+                    {u.email}
+                  </span>
                   {extras && (
-                    <span className="text-zinc-500 dark:text-zinc-500 truncate">{extras}</span>
+                    <span className="text-zinc-500 dark:text-zinc-500 truncate" title={extras}>
+                      {extras}
+                    </span>
                   )}
                 </div>
               )
             })()}
           </div>
 
-          <div className="flex items-center gap-1 bg-zinc-50/50 dark:bg-zinc-800/50 p-1 border border-zinc-200 dark:border-zinc-700 rounded-xl">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
+            <div className="flex items-center gap-1 bg-zinc-50/50 dark:bg-zinc-800/50 p-1 border border-zinc-200 dark:border-zinc-700 rounded-xl w-full sm:w-auto justify-center">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={handlePrevMonth}
+                aria-label="Previous month"
+                className="rounded-lg w-10 h-10 min-w-[44px] min-h-[44px] shrink-0"
+              >
+                <ChevronLeft className="w-5 h-5" />
+              </Button>
+              <span className="px-3 py-2 min-w-0 flex-1 sm:flex-none sm:min-w-[200px] font-semibold text-zinc-900 dark:text-zinc-100 text-sm sm:text-base text-center">
+                {monthLabel}
+              </span>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={handleNextMonth}
+                aria-label="Next month"
+                className="rounded-lg w-10 h-10 min-w-[44px] min-h-[44px] shrink-0"
+              >
+                <ChevronRight className="w-5 h-5" />
+              </Button>
+            </div>
             <Button
               type="button"
-              variant="ghost"
+              variant="secondary"
               size="sm"
-              onClick={handlePrevMonth}
-              aria-label="Previous month"
-              className="rounded-lg w-9 h-9"
+              onClick={() => setExportPdfModalOpen(true)}
+              disabled={!selectedUserId}
+              leftIcon={<Download className="h-4 w-4 shrink-0" />}
+              className="w-full sm:w-auto min-h-[44px]"
             >
-              <ChevronLeft className="w-5 h-5" />
-            </Button>
-            <span className="px-4 py-1.5 min-w-[200px] font-semibold text-zinc-900 dark:text-zinc-100 text-base text-center">
-              {monthLabel}
-            </span>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={handleNextMonth}
-              aria-label="Next month"
-              className="rounded-lg w-9 h-9"
-            >
-              <ChevronRight className="w-5 h-5" />
+              View Report
             </Button>
           </div>
-
-          <Button
-            type="button"
-            variant="secondary"
-            size="sm"
-            onClick={() => setExportPdfModalOpen(true)}
-            disabled={!selectedUserId}
-            leftIcon={<Download className="h-4 w-4" />}
-          >
-            View Report
-          </Button>
         </div>
 
         <div className="bg-zinc-50/30 dark:bg-zinc-900/30 shadow-sm mt-8 border border-zinc-200 dark:border-zinc-700 rounded-2xl overflow-x-auto">
