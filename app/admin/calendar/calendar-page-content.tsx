@@ -631,13 +631,13 @@ export const CalendarPageContent = () => {
   ])
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 min-w-0 overflow-x-hidden">
       <PageHeader
         title="Calendar"
         description="View user schedules and attendance"
       />
 
-      <Card variant="default" padding="md">
+      <Card variant="default" padding="none" className="min-w-0 p-4 sm:p-6">
         {selectedUserId && totalRegularMinutes > 0 && (
           <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-4 rounded-xl border border-zinc-200/80 bg-zinc-50/50 px-4 py-3 dark:border-zinc-700/80 dark:bg-zinc-800/30">
             <p className="text-sm font-medium text-zinc-600 dark:text-zinc-400">
@@ -741,7 +741,10 @@ export const CalendarPageContent = () => {
           </div>
         </div>
 
-        <div className="bg-zinc-50/30 dark:bg-zinc-900/30 shadow-sm mt-8 border border-zinc-200 dark:border-zinc-700 rounded-2xl overflow-x-auto">
+        <div
+          className="bg-zinc-50/30 dark:bg-zinc-900/30 shadow-sm mt-6 sm:mt-8 border border-zinc-200 dark:border-zinc-700 rounded-2xl overflow-x-auto -mx-1 px-1 sm:mx-0 sm:px-0"
+          style={{ WebkitOverflowScrolling: "touch" }}
+        >
           <div className="min-w-[600px]">
             <div className="grid grid-cols-7 bg-white dark:bg-zinc-800/50 border-zinc-200 dark:border-zinc-700 border-b">
               {WEEKDAYS.map((day) => (
@@ -963,12 +966,12 @@ export const CalendarPageContent = () => {
           </div>
         </div>
 
-        <div className="flex flex-col gap-6 bg-zinc-50/50 dark:bg-zinc-900/30 mt-8 p-4 border border-zinc-200 dark:border-zinc-700 rounded-xl">
-          <div className="flex sm:flex-row flex-col sm:items-center gap-3 sm:gap-6">
-            <span className="font-semibold text-zinc-700 dark:text-zinc-300 text-sm">
+        <div className="flex flex-col gap-4 sm:gap-6 bg-zinc-50/50 dark:bg-zinc-900/30 mt-6 sm:mt-8 p-4 border border-zinc-200 dark:border-zinc-700 rounded-xl">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-6">
+            <span className="font-semibold text-zinc-700 dark:text-zinc-300 text-sm shrink-0">
               Attendance
             </span>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-2 min-w-0">
               {LEGENDS.map(({ status, label, bg, color }) => (
                 <span
                   key={status}
@@ -993,11 +996,11 @@ export const CalendarPageContent = () => {
               ))}
             </div>
           </div>
-          <div className="flex sm:flex-row flex-col sm:items-center gap-3 sm:gap-6">
-            <span className="font-semibold text-zinc-700 dark:text-zinc-300 text-sm">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-6">
+            <span className="font-semibold text-zinc-700 dark:text-zinc-300 text-sm shrink-0">
               Date
             </span>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-2 min-w-0">
               {DATE_LEGENDS.map(({ key, label, bg, color, dot }) => (
                 <span
                   key={key}
