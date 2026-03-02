@@ -637,9 +637,9 @@ export const CalendarPageContent = () => {
         description="View user schedules and attendance"
       />
 
-      <Card variant="default" padding="none" className="min-w-0 p-4 sm:p-6">
+      <Card variant="default" padding="none" className="min-w-0 p-4 md:p-6">
         {selectedUserId && totalRegularMinutes > 0 && (
-          <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-4 rounded-xl border border-zinc-200/80 bg-zinc-50/50 px-4 py-3 dark:border-zinc-700/80 dark:bg-zinc-800/30">
+          <div className="mb-6 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-2 lg:gap-4 rounded-xl border border-zinc-200/80 bg-zinc-50/50 px-4 py-3 dark:border-zinc-700/80 dark:bg-zinc-800/30">
             <p className="text-sm font-medium text-zinc-600 dark:text-zinc-400">
               Total hours this month
             </p>
@@ -648,9 +648,9 @@ export const CalendarPageContent = () => {
             </p>
           </div>
         )}
-        <div className="flex flex-col gap-4 sm:gap-6 sm:flex-row sm:justify-between sm:items-center">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-6 w-full sm:w-auto">
-            <div className="flex flex-col gap-2 w-full sm:w-auto sm:min-w-[200px]">
+        <div className="flex flex-col gap-4 lg:flex-row lg:justify-between lg:items-center lg:gap-6">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:gap-6 w-full lg:w-auto min-w-0">
+            <div className="flex flex-col gap-2 w-full lg:min-w-[200px]">
               <label
                 htmlFor="calendar-user-select"
                 className="flex items-center gap-2 font-medium text-zinc-700 dark:text-zinc-300 text-sm shrink-0"
@@ -658,7 +658,7 @@ export const CalendarPageContent = () => {
                 <User className="w-4 h-4 shrink-0" aria-hidden />
                 Select user
               </label>
-              <div className="relative w-full sm:min-w-[200px]">
+              <div className="relative w-full min-w-0">
                 <select
                   id="calendar-user-select"
                   value={selectedUserId}
@@ -688,7 +688,7 @@ export const CalendarPageContent = () => {
               const extras = [u.position, u.userId && `ID: ${u.userId}`].filter(Boolean).join(" • ")
               const fullLine = extras ? `${u.email} • ${extras}` : u.email
               return (
-                <div className="min-w-0 max-w-full sm:max-w-[220px]">
+                <div className="min-w-0 max-w-full lg:max-w-[220px]">
                   <p
                     className="truncate text-sm text-zinc-600 dark:text-zinc-400"
                     title={fullLine}
@@ -700,8 +700,8 @@ export const CalendarPageContent = () => {
             })()}
           </div>
 
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
-            <div className="flex items-center gap-1 bg-zinc-50/50 dark:bg-zinc-800/50 p-1 border border-zinc-200 dark:border-zinc-700 rounded-xl w-full sm:w-auto justify-center">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:gap-4 min-w-0">
+            <div className="flex items-center gap-1 bg-zinc-50/50 dark:bg-zinc-800/50 p-1 border border-zinc-200 dark:border-zinc-700 rounded-xl w-full lg:w-auto justify-center min-w-0">
               <Button
                 type="button"
                 variant="ghost"
@@ -712,7 +712,7 @@ export const CalendarPageContent = () => {
               >
                 <ChevronLeft className="w-5 h-5" />
               </Button>
-              <span className="px-3 py-2 min-w-0 flex-1 sm:flex-none sm:min-w-[200px] font-semibold text-zinc-900 dark:text-zinc-100 text-sm sm:text-base text-center">
+              <span className="px-3 py-2 min-w-0 flex-1 lg:flex-none lg:min-w-[180px] font-semibold text-zinc-900 dark:text-zinc-100 text-sm lg:text-base text-center truncate">
                 {monthLabel}
               </span>
               <Button
@@ -733,7 +733,7 @@ export const CalendarPageContent = () => {
               onClick={() => setExportPdfModalOpen(true)}
               disabled={!selectedUserId}
               leftIcon={<Download className="h-4 w-4 shrink-0" />}
-              className="w-full sm:w-auto min-h-[44px]"
+              className="w-full lg:w-auto min-h-[44px] shrink-0"
             >
               View Report
             </Button>
@@ -741,7 +741,7 @@ export const CalendarPageContent = () => {
         </div>
 
         <div
-          className="bg-zinc-50/30 dark:bg-zinc-900/30 shadow-sm mt-6 sm:mt-8 border border-zinc-200 dark:border-zinc-700 rounded-2xl overflow-x-auto -mx-1 px-1 sm:mx-0 sm:px-0"
+          className="bg-zinc-50/30 dark:bg-zinc-900/30 shadow-sm mt-6 md:mt-8 border border-zinc-200 dark:border-zinc-700 rounded-2xl overflow-x-auto -mx-1 px-1 md:mx-0 md:px-0"
           style={{ WebkitOverflowScrolling: "touch" }}
         >
           <div className="min-w-[600px]">
@@ -965,8 +965,8 @@ export const CalendarPageContent = () => {
           </div>
         </div>
 
-        <div className="flex flex-col gap-4 sm:gap-6 bg-zinc-50/50 dark:bg-zinc-900/30 mt-6 sm:mt-8 p-4 border border-zinc-200 dark:border-zinc-700 rounded-xl">
-          <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-6">
+        <div className="flex flex-col gap-4 lg:gap-6 bg-zinc-50/50 dark:bg-zinc-900/30 mt-6 md:mt-8 p-4 border border-zinc-200 dark:border-zinc-700 rounded-xl">
+          <div className="flex flex-col lg:flex-row lg:items-center gap-2 lg:gap-6">
             <span className="font-semibold text-zinc-700 dark:text-zinc-300 text-sm shrink-0">
               Attendance
             </span>
@@ -995,7 +995,7 @@ export const CalendarPageContent = () => {
               ))}
             </div>
           </div>
-          <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-6">
+          <div className="flex flex-col lg:flex-row lg:items-center gap-2 lg:gap-6">
             <span className="font-semibold text-zinc-700 dark:text-zinc-300 text-sm shrink-0">
               Date
             </span>
