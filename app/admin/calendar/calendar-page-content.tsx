@@ -686,16 +686,15 @@ export const CalendarPageContent = () => {
               const u = users.find((x) => x.id === selectedUserId)
               if (!u) return null
               const extras = [u.position, u.userId && `ID: ${u.userId}`].filter(Boolean).join(" • ")
+              const fullLine = extras ? `${u.email} • ${extras}` : u.email
               return (
-                <div className="flex flex-col gap-0.5 sm:flex-row sm:items-baseline sm:gap-3 text-sm text-zinc-600 dark:text-zinc-400 min-w-0">
-                  <span className="truncate" title={u.email}>
-                    {u.email}
-                  </span>
-                  {extras && (
-                    <span className="text-zinc-500 dark:text-zinc-500 truncate" title={extras}>
-                      {extras}
-                    </span>
-                  )}
+                <div className="min-w-0 max-w-full sm:max-w-[220px]">
+                  <p
+                    className="truncate text-sm text-zinc-600 dark:text-zinc-400"
+                    title={fullLine}
+                  >
+                    {fullLine}
+                  </p>
                 </div>
               )
             })()}
