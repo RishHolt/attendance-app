@@ -16,7 +16,7 @@ export type AdminAttendanceRow = {
   userDisplayId: string
   fullName: string
   date: string
-  status: "present" | "late" | "absent"
+  status: "present" | "late" | "absent" | "incomplete"
   approvalStatus: "pending" | "approved" | "denied"
   timeIn: string | null
   timeOut: string | null
@@ -36,6 +36,8 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
     const approvalStatus = searchParams.get("approval_status")
+    const statusFilter = searchParams.get("status")
+    const search = searchParams.get("search")?.trim() ?? ""
     const fromParam = searchParams.get("from")
     const toParam = searchParams.get("to")
     const pageParam = searchParams.get("page")
@@ -48,6 +50,20 @@ export async function GET(request: Request) {
     const offset = (page - 1) * limit
 
     const supabase = await createClient()
+
+    let userIdsFilter: string[] | null = null
+    if (search.length > 0) {
+      const searchPattern = `*${search}*`
+      const { data: usersData } = await supabase
+        .from("users")
+        .select("id")
+        .or(`full_name.ilike.${searchPattern},user_id.ilike.${searchPattern}`)
+      const ids = (usersData ?? []).map((u) => u.id)
+      if (ids.length === 0) {
+        return NextResponse.json({ rows: [], total: 0 })
+      }
+      userIdsFilter = ids
+    }
 
     let query = supabase
       .from("attendances")
@@ -69,6 +85,18 @@ export async function GET(request: Request) {
 
     if (approvalStatus === "pending" || approvalStatus === "approved" || approvalStatus === "denied") {
       query = query.eq("approval_status", approvalStatus)
+      if (approvalStatus === "pending") {
+        query = query.not("time_out", "is", null)
+      }
+    }
+    if (statusFilter === "incomplete") {
+      query = query
+        .not("time_in", "is", null)
+        .is("time_out", null)
+        .eq("approval_status", "pending")
+    }
+    if (userIdsFilter && userIdsFilter.length > 0) {
+      query = query.in("user_id", userIdsFilter)
     }
     query = query.gte("attendance_date", from).lte("attendance_date", to).range(offset, offset + limit - 1)
 
@@ -108,7 +136,7 @@ export async function GET(request: Request) {
         userDisplayId: user?.user_id ?? "",
         fullName: user?.full_name ?? "Unknown",
         date: row.attendance_date,
-        status: row.status as "present" | "late" | "absent",
+        status: row.status as "present" | "late" | "absent" | "incomplete",
         approvalStatus: (row.approval_status ?? "pending") as "pending" | "approved" | "denied",
         timeIn: row.time_in ? formatTime(row.time_in) : null,
         timeOut: row.time_out ? formatTime(row.time_out) : null,

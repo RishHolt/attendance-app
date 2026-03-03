@@ -8,8 +8,9 @@ import { calcWorkMinutes, formatMinutesAsHours, formatTotalWithOvertime } from "
 import { deriveAttendanceStatus, type AttendanceStatus } from "@/lib/attendance-status"
 import { generateCalendarPdf, type AttendanceExportRow, type ExportSummary } from "@/lib/calendar-pdf"
 import { UserPageLayout } from "@/components/user/user-page-layout"
+import { PageSection } from "@/components/user/page-section"
 import { ExportPdfModal } from "@/app/admin/calendar/export-pdf-modal"
-
+import { RequestCorrectionModal } from "@/app/user/attendance/request-correction-modal"
 type MeUser = {
   id: string
   fullName: string
@@ -27,10 +28,13 @@ type ScheduleRow = {
 
 type AttendanceRow = {
   id: string
+  userId?: string
   date: string
   status: string
+  approvalStatus?: "pending" | "approved" | "denied"
   timeIn: string | null
   timeOut: string | null
+  correctionStatus?: string | null
 }
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
@@ -103,6 +107,8 @@ export const UserCalendarPageContent = () => {
   const [loadError, setLoadError] = useState<string | null>(null)
   const [exportPdfModalOpen, setExportPdfModalOpen] = useState(false)
   const [isExporting, setIsExporting] = useState(false)
+  const [correctionModalRow, setCorrectionModalRow] = useState<AttendanceRow | null>(null)
+  const [refreshTrigger, setRefreshTrigger] = useState(0)
 
   useEffect(() => {
     const loadMe = async () => {
@@ -150,7 +156,7 @@ export const UserCalendarPageContent = () => {
     return () => {
       cancelled = true
     }
-  }, [me?.id, currentDate])
+  }, [me?.id, currentDate, refreshTrigger])
 
   const scheduleByDay = useMemo(() => {
     const map = new Map<number, ScheduleRow>()
@@ -225,6 +231,21 @@ export const UserCalendarPageContent = () => {
     setCurrentDate((d) => new Date(d.getFullYear(), d.getMonth() + 1))
   }
 
+  const canRequestCorrection = (
+    row: AttendanceRow,
+    displayedStatus: string
+  ) =>
+    (displayedStatus === "incomplete" ||
+      displayedStatus === "late" ||
+      displayedStatus === "absent" ||
+      row.approvalStatus === "denied") &&
+    row.correctionStatus !== "pending"
+
+  const handleCorrectionSuccess = useCallback(() => {
+    setCorrectionModalRow(null)
+    setRefreshTrigger((t) => t + 1)
+  }, [])
+
   const handleExportPdf = useCallback(
     async (opts: {
       mode: "month" | "custom"
@@ -294,6 +315,7 @@ export const UserCalendarPageContent = () => {
             ? deriveAttendanceStatus({
                 hasSchedule: true,
                 hasTimeIn: !!existingAttendance?.timeIn,
+                hasTimeOut: !!existingAttendance?.timeOut,
                 scheduledTimeIn: schedule.timeIn,
                 actualTimeIn: existingAttendance?.timeIn ?? null,
                 dateStr,
@@ -469,12 +491,13 @@ export const UserCalendarPageContent = () => {
       <UserPageLayout
         title="Calendar"
         description="View your attendance calendar"
-        showUserDetails={true}
       >
-        <div className="flex flex-col items-center justify-center rounded-2xl border border-zinc-200/80 bg-white py-16 shadow-sm dark:border-zinc-800/80 dark:bg-zinc-900 dark:shadow-zinc-950/30">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-zinc-300 border-t-zinc-600 dark:border-zinc-600 dark:border-t-zinc-300" />
-          <p className="mt-4 text-sm text-zinc-500 dark:text-zinc-400">Loading…</p>
-        </div>
+        <PageSection>
+          <div className="flex flex-col items-center justify-center py-16">
+            <div className="h-8 w-8 animate-spin rounded-full border-2 border-zinc-300 border-t-zinc-600 dark:border-zinc-600 dark:border-t-zinc-300" />
+            <p className="mt-4 text-sm text-zinc-500 dark:text-zinc-400">Loading…</p>
+          </div>
+        </PageSection>
       </UserPageLayout>
     )
   }
@@ -484,11 +507,12 @@ export const UserCalendarPageContent = () => {
       <UserPageLayout
         title="Calendar"
         description="View your attendance calendar"
-        showUserDetails={true}
       >
-        <div className="rounded-2xl border border-zinc-200/80 bg-white p-4 sm:p-8 shadow-sm dark:border-zinc-800/80 dark:bg-zinc-900 dark:shadow-zinc-950/30">
-          <p className="text-red-600 dark:text-red-400">{loadError ?? "Unable to load calendar"}</p>
-        </div>
+        <PageSection>
+          <p className="text-red-600 dark:text-red-400" role="alert">
+            {loadError ?? "Unable to load calendar"}
+          </p>
+        </PageSection>
       </UserPageLayout>
     )
   }
@@ -497,21 +521,23 @@ export const UserCalendarPageContent = () => {
     <UserPageLayout
       title="Calendar"
       description="View your attendance calendar"
-      showUserDetails={true}
     >
-      <div className="space-y-6">
+      <div className="space-y-8">
         {totalRegularMinutes > 0 && (
-          <div className="flex flex-row items-center justify-between gap-4 rounded-xl border border-zinc-200/80 bg-zinc-50/50 px-4 py-3 dark:border-zinc-700/80 dark:bg-zinc-800/30">
+          <PageSection padding="sm">
+            <div className="flex flex-row items-center justify-between gap-4">
             <p className="text-sm font-medium text-zinc-600 dark:text-zinc-400">
               Total hours this month
             </p>
             <p className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
               {formatMinutesAsHours(totalRegularMinutes)}
             </p>
-          </div>
+            </div>
+          </PageSection>
         )}
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-1 rounded-xl border border-zinc-200/80 bg-zinc-50/50 p-1 dark:border-zinc-700/80 dark:bg-zinc-800/50">
+        <PageSection>
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-6">
+            <div className="flex items-center gap-1 rounded-xl border border-zinc-200/80 bg-zinc-50/50 p-1 dark:border-zinc-700/80 dark:bg-zinc-800/50">
             <Button
               type="button"
               variant="ghost"
@@ -577,6 +603,7 @@ export const UserCalendarPageContent = () => {
                     ? deriveAttendanceStatus({
                         hasSchedule: true,
                         hasTimeIn: !!existingAttendance?.timeIn,
+                        hasTimeOut: !!existingAttendance?.timeOut,
                         scheduledTimeIn: schedule.timeIn,
                         actualTimeIn: existingAttendance?.timeIn ?? null,
                         dateStr,
@@ -586,15 +613,18 @@ export const UserCalendarPageContent = () => {
                       })
                     : "no-schedule"
                 const status: AttendanceStatus =
-                  existingAttendance?.status === "absent" && !existingAttendance?.timeIn
-                    ? "absent"
-                    : existingAttendance?.status === "late"
-                      ? "late"
-                      : existingAttendance && !hasSchedule
-                        ? (existingAttendance.status as AttendanceStatus)
+                  !hasSchedule
+                    ? "no-schedule"
+                    : existingAttendance?.status === "absent" && !existingAttendance?.timeIn
+                      ? "absent"
+                      : existingAttendance?.status === "late"
+                        ? "late"
                         : derivedStatus
                 const dateKey = `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`
                 const isToday = dateKey === todayKey
+                const eligibleForCorrection =
+                  existingAttendance &&
+                  canRequestCorrection(existingAttendance, status)
 
                 const cellBg =
                   isToday
@@ -626,6 +656,19 @@ export const UserCalendarPageContent = () => {
                       >
                         {date.getDate()}
                       </span>
+                      {eligibleForCorrection && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setCorrectionModalRow(existingAttendance)
+                          }}
+                          aria-label={`Request correction for ${date.toLocaleDateString("en-US")}`}
+                          className="text-[10px] font-medium text-zinc-500 underline hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-300"
+                        >
+                          Request correction
+                        </button>
+                      )}
                     </div>
                     <div className="mt-2 space-y-1.5">
                       {hasSchedule ? (
@@ -665,27 +708,6 @@ export const UserCalendarPageContent = () => {
                           ) : (
                             <p className="italic leading-tight text-zinc-500 dark:text-zinc-500">
                               Scheduled: {formatTime12(schedule.timeIn)} – {formatTime12(schedule.timeOut)}
-                            </p>
-                          )}
-                        </div>
-                      ) : existingAttendance ? (
-                        <div className="space-y-0.5 text-xs">
-                          {existingAttendance.timeIn ? (
-                            <>
-                              <p className="leading-tight text-zinc-600 dark:text-zinc-400">
-                                <span className="font-medium text-zinc-500 dark:text-zinc-500">Time in: </span>
-                                {formatTime12(existingAttendance.timeIn)}
-                              </p>
-                              <p className="leading-tight text-zinc-600 dark:text-zinc-400">
-                                <span className="font-medium text-zinc-500 dark:text-zinc-500">Time out: </span>
-                                {existingAttendance.timeOut
-                                  ? formatTime12(existingAttendance.timeOut)
-                                  : "—"}
-                              </p>
-                            </>
-                          ) : (
-                            <p className="italic leading-tight text-zinc-400 dark:text-zinc-500">
-                              No time recorded
                             </p>
                           )}
                         </div>
@@ -758,6 +780,7 @@ export const UserCalendarPageContent = () => {
             </div>
           </div>
         </div>
+        </PageSection>
       </div>
 
       <ExportPdfModal
@@ -766,6 +789,13 @@ export const UserCalendarPageContent = () => {
         onExport={handleExportPdf}
         currentMonthLabel={monthLabel}
         disabled={isExporting}
+      />
+
+      <RequestCorrectionModal
+        open={!!correctionModalRow}
+        onClose={() => setCorrectionModalRow(null)}
+        row={correctionModalRow}
+        onSuccess={handleCorrectionSuccess}
       />
     </UserPageLayout>
   )

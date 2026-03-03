@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react"
 import { useSearchParams } from "next/navigation"
-import Link from "next/link"
 import { motion } from "motion/react"
 import { Button, Input } from "@/components/ui"
 import { swal } from "@/lib/swal"
@@ -27,6 +26,8 @@ const LogInIcon = () => (
 export const LoginForm = () => {
   const searchParams = useSearchParams()
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [login, setLogin] = useState("")
+  const [password, setPassword] = useState("")
 
   useEffect(() => {
     const error = searchParams.get("error")
@@ -39,16 +40,46 @@ export const LoginForm = () => {
     }
   }, [searchParams])
 
-  const handleSubmit = () => {
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (isSubmitting) return
     setIsSubmitting(true)
+    try {
+      const formData = new FormData()
+      formData.set("login", login.trim())
+      formData.set("password", password)
+      const returnTo = searchParams.get("returnTo") ?? ""
+      if (returnTo) formData.set("returnTo", returnTo)
+
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        body: formData,
+        headers: { "X-Requested-With": "XMLHttpRequest" },
+      })
+
+      const data = await res.json().catch(() => ({}))
+
+      if (!res.ok) {
+        swal.error(data?.error ?? "Sign in failed")
+        setIsSubmitting(false)
+        return
+      }
+
+      if (data?.redirect) {
+        window.location.href = data.redirect
+      } else {
+        window.location.href = "/admin"
+      }
+    } catch {
+      swal.error("Something went wrong")
+      setIsSubmitting(false)
+    }
   }
 
   const returnTo = searchParams.get("returnTo") ?? ""
 
   return (
     <form
-      action="/api/auth/login"
-      method="POST"
       onSubmit={handleSubmit}
       className="flex w-full flex-col gap-6"
       noValidate
@@ -64,11 +95,13 @@ export const LoginForm = () => {
         <Input
           id="login"
           name="login"
-          type="text"
-          label="Email or username"
-          placeholder="you@example.com or username"
-          autoComplete="username email"
+          type="email"
+          label="Email"
+          placeholder="you@example.com"
+          autoComplete="email"
           required
+          value={login}
+          onChange={(e) => setLogin(e.target.value)}
         />
       </motion.div>
       <motion.div
@@ -84,6 +117,8 @@ export const LoginForm = () => {
           placeholder="••••••••"
           autoComplete="current-password"
           required
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
         />
       </motion.div>
       <motion.div
@@ -101,20 +136,6 @@ export const LoginForm = () => {
           {isSubmitting ? "Signing in…" : "Sign in"}
         </Button>
       </motion.div>
-      <motion.p
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.35, duration: 0.4 }}
-        className="text-center text-sm text-zinc-600 dark:text-zinc-400"
-      >
-        Don&apos;t have an account?{" "}
-        <Link
-          href="/auth/register"
-          className="font-medium text-zinc-900 underline-offset-4 hover:underline dark:text-zinc-100"
-        >
-          Register
-        </Link>
-      </motion.p>
     </form>
   )
 }

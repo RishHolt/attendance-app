@@ -34,7 +34,6 @@ type UserRow = {
   id: string
   userId: string
   fullName: string
-  username: string | null
   email: string
   contactNo: string | null
   position: string | null
@@ -232,7 +231,6 @@ export const UsersPageContent = () => {
       u.fullName.toLowerCase().includes(q) ||
       u.userId.includes(q) ||
       u.email.toLowerCase().includes(q) ||
-      (u.username?.toLowerCase().includes(q) ?? false) ||
       (u.contactNo?.toLowerCase().includes(q) ?? false) ||
       (u.position?.toLowerCase().includes(q) ?? false)
     )
@@ -282,7 +280,7 @@ export const UsersPageContent = () => {
             />
             <Input
               type="search"
-              placeholder="Search by name, email, username, contact, or position..."
+              placeholder="Search by name, email, contact, or position..."
               value={search}
               onChange={handleSearchChange}
               aria-label="Search users"
@@ -333,12 +331,10 @@ export const UsersPageContent = () => {
             </div>
           ) : (
             <>
-              <Table className="hidden min-w-[700px] md:table">
+              <Table className="hidden min-w-[520px] md:table">
                 <TableHeader>
                   <TableRow variant="header">
-                    <TableHead>User</TableHead>
-                    <TableHead>Username</TableHead>
-                    <TableHead>Email</TableHead>
+                    <TableHead>Name &amp; Email</TableHead>
                     <TableHead>Position</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead align="right">Actions</TableHead>
@@ -356,23 +352,14 @@ export const UsersPageContent = () => {
                             <span className="font-medium text-zinc-900 dark:text-zinc-100">
                               {user.fullName}
                             </span>
-                            <span className="font-mono text-xs text-zinc-500 dark:text-zinc-400">
+                            <span className="text-sm text-zinc-500 dark:text-zinc-400">
+                              {user.email}
+                            </span>
+                            <span className="font-mono text-xs text-zinc-400 dark:text-zinc-500">
                               {user.userId}
+                              {user.contactNo ? ` · ${user.contactNo}` : ""}
                             </span>
                           </div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <span className="text-zinc-900 dark:text-zinc-100">
-                          {user.username ? `@${user.username}` : "—"}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-col gap-0.5">
-                          <span className="text-zinc-900 dark:text-zinc-100">{user.email}</span>
-                          <span className="text-xs text-zinc-500 dark:text-zinc-400">
-                            {user.contactNo || "—"}
-                          </span>
                         </div>
                       </TableCell>
                       <TableCell>

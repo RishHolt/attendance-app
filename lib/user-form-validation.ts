@@ -13,13 +13,6 @@ export const validateEmail = (value: string): string | null => {
   return null
 }
 
-export const validateUsername = (value: string): string | null => {
-  const trimmed = value.trim()
-  if (!trimmed) return "Username is required"
-  if (trimmed.length < 3) return "Username must be at least 3 characters"
-  return null
-}
-
 export const validatePassword = (value: string): string | null => {
   if (!value) return "Password is required"
   if (value.length < 8) return "Password must be at least 8 characters"
@@ -43,7 +36,6 @@ export const validatePosition = (value: string): string | null => {
 export const validateUserForm = (fields: {
   fullName: string
   email: string
-  username: string
   contactNo: string
   position: string
   password?: string
@@ -52,12 +44,10 @@ export const validateUserForm = (fields: {
   const errors: Record<string, string> = {}
   const fullNameErr = validateFullName(fields.fullName)
   const emailErr = validateEmail(fields.email)
-  const usernameErr = validateUsername(fields.username)
   const contactNoErr = validateContactNo(fields.contactNo)
   const positionErr = validatePosition(fields.position)
   if (fullNameErr) errors.fullName = fullNameErr
   if (emailErr) errors.email = emailErr
-  if (usernameErr) errors.username = usernameErr
   if (contactNoErr) errors.contactNo = contactNoErr
   if (positionErr) errors.position = positionErr
   if (fields.password !== undefined) {

@@ -15,6 +15,7 @@ export type ExportSummary = {
   totalPresent: number
   totalLate: number
   totalAbsent: number
+  totalIncomplete?: number
 }
 
 export type ExportAttendanceInput = {
@@ -244,10 +245,21 @@ export async function generateCalendarPdf(input: ExportAttendanceInput): Promise
     { x: margin, y: summaryY, size: 9, font, color: zinc[500] }
   )
   summaryY -= 14
-  currentPage.drawText(
-    `Present ${summary.totalPresent}  ·  Late ${summary.totalLate}  ·  Absent ${summary.totalAbsent}`,
-    { x: margin, y: summaryY, size: 9, font, color: zinc[500] }
-  )
+  const statusParts = [
+    `Present ${summary.totalPresent}`,
+    `Late ${summary.totalLate}`,
+    `Absent ${summary.totalAbsent}`,
+  ]
+  if ((summary.totalIncomplete ?? 0) > 0) {
+    statusParts.push(`Incomplete ${summary.totalIncomplete}`)
+  }
+  currentPage.drawText(statusParts.join("  ·  "), {
+    x: margin,
+    y: summaryY,
+    size: 9,
+    font,
+    color: zinc[500],
+  })
   summaryY -= 40
 
   const sigLineWidth = 180

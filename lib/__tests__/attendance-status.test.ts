@@ -31,6 +31,7 @@ describe("deriveAttendanceStatus", () => {
       deriveAttendanceStatus({
         hasSchedule: false,
         hasTimeIn: false,
+        hasTimeOut: false,
         scheduledTimeIn,
         actualTimeIn: null,
         dateStr: todayStr,
@@ -41,11 +42,12 @@ describe("deriveAttendanceStatus", () => {
     ).toBe("no-schedule")
   })
 
-  it("returns present when has time-in and within 15 min of scheduled", () => {
+  it("returns present when has time-in, time-out and within 15 min of scheduled", () => {
     expect(
       deriveAttendanceStatus({
         hasSchedule: true,
         hasTimeIn: true,
+        hasTimeOut: true,
         scheduledTimeIn,
         actualTimeIn: "08:10",
         dateStr: todayStr,
@@ -56,11 +58,12 @@ describe("deriveAttendanceStatus", () => {
     ).toBe("present")
   })
 
-  it("returns late when has time-in and more than 15 min after scheduled", () => {
+  it("returns late when has time-in, time-out and more than 15 min after scheduled", () => {
     expect(
       deriveAttendanceStatus({
         hasSchedule: true,
         hasTimeIn: true,
+        hasTimeOut: true,
         scheduledTimeIn,
         actualTimeIn: "08:20",
         dateStr: todayStr,
@@ -71,11 +74,28 @@ describe("deriveAttendanceStatus", () => {
     ).toBe("late")
   })
 
+  it("returns incomplete when has time-in but no time-out", () => {
+    expect(
+      deriveAttendanceStatus({
+        hasSchedule: true,
+        hasTimeIn: true,
+        hasTimeOut: false,
+        scheduledTimeIn,
+        actualTimeIn: "08:10",
+        dateStr: todayStr,
+        todayStr,
+        tomorrowStr,
+        startDateStr: null,
+      })
+    ).toBe("incomplete")
+  })
+
   it("returns upcoming for tomorrow only", () => {
     expect(
       deriveAttendanceStatus({
         hasSchedule: true,
         hasTimeIn: false,
+        hasTimeOut: false,
         scheduledTimeIn,
         actualTimeIn: null,
         dateStr: tomorrowStr,
@@ -91,6 +111,7 @@ describe("deriveAttendanceStatus", () => {
       deriveAttendanceStatus({
         hasSchedule: true,
         hasTimeIn: false,
+        hasTimeOut: false,
         scheduledTimeIn,
         actualTimeIn: null,
         dateStr: yesterdayStr,
@@ -106,6 +127,7 @@ describe("deriveAttendanceStatus", () => {
       deriveAttendanceStatus({
         hasSchedule: true,
         hasTimeIn: false,
+        hasTimeOut: false,
         scheduledTimeIn,
         actualTimeIn: null,
         dateStr: "2025-01-01",
@@ -121,6 +143,7 @@ describe("deriveAttendanceStatus", () => {
       deriveAttendanceStatus({
         hasSchedule: true,
         hasTimeIn: false,
+        hasTimeOut: false,
         scheduledTimeIn,
         actualTimeIn: null,
         dateStr: "2024-12-31",
@@ -136,6 +159,7 @@ describe("deriveAttendanceStatus", () => {
       deriveAttendanceStatus({
         hasSchedule: true,
         hasTimeIn: false,
+        hasTimeOut: false,
         scheduledTimeIn,
         actualTimeIn: null,
         dateStr: yesterdayStr,
@@ -151,6 +175,7 @@ describe("deriveAttendanceStatus", () => {
       deriveAttendanceStatus({
         hasSchedule: true,
         hasTimeIn: false,
+        hasTimeOut: false,
         scheduledTimeIn,
         actualTimeIn: null,
         dateStr: todayStr,
@@ -166,6 +191,7 @@ describe("deriveAttendanceStatus", () => {
       deriveAttendanceStatus({
         hasSchedule: true,
         hasTimeIn: false,
+        hasTimeOut: false,
         scheduledTimeIn,
         actualTimeIn: null,
         dateStr: "2025-03-20",

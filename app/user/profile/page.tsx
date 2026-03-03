@@ -1,15 +1,17 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
+import { Pencil } from "lucide-react"
 import { UserPageLayout } from "@/components/user/user-page-layout"
-import { Card } from "@/components/ui"
+import { PageSection } from "@/components/user/page-section"
+import { Button } from "@/components/ui"
+import { EditProfileModal } from "./edit-profile-modal"
 
 type MeUser = {
   id: string
   userId: string
   fullName: string
   email: string
-  username: string | null
   contactNo: string | null
   position: string | null
   startDate: string | null
@@ -18,13 +20,22 @@ type MeUser = {
 export default function UserProfilePage() {
   const [me, setMe] = useState<MeUser | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [editModalOpen, setEditModalOpen] = useState(false)
+
+  const loadProfile = useCallback(async () => {
+    const res = await fetch("/api/me")
+    const data = res.ok ? await res.json() : null
+    setMe(data)
+  }, [])
 
   useEffect(() => {
-    fetch("/api/me")
-      .then((r) => (r.ok ? r.json() : null))
-      .then(setMe)
-      .finally(() => setIsLoading(false))
-  }, [])
+    setIsLoading(true)
+    loadProfile().finally(() => setIsLoading(false))
+  }, [loadProfile])
+
+  const handleEditSuccess = () => {
+    loadProfile()
+  }
 
   const formatDate = (s: string | null) => {
     if (!s) return "—"
@@ -40,9 +51,23 @@ export default function UserProfilePage() {
     <UserPageLayout
       title="Profile"
       description="View your profile information"
-      showUserDetails={false}
     >
-      <Card variant="default" padding="md">
+      <PageSection
+        title="Profile information"
+        action={
+          me ? (
+            <Button
+              variant="secondary"
+              size="sm"
+              leftIcon={<Pencil className="h-4 w-4" aria-hidden />}
+              onClick={() => setEditModalOpen(true)}
+              aria-label="Edit profile"
+            >
+              Edit
+            </Button>
+          ) : null
+        }
+      >
         {isLoading ? (
           <div className="flex flex-col items-center justify-center py-16">
             <div className="h-8 w-8 animate-spin rounded-full border-2 border-zinc-300 border-t-zinc-600 dark:border-zinc-600 dark:border-t-zinc-300" />
@@ -70,14 +95,6 @@ export default function UserProfilePage() {
             </div>
             <div>
               <dt className="text-xs font-medium uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-                Username
-              </dt>
-              <dd className="mt-1 text-zinc-900 dark:text-zinc-100">
-                {me.username ? `@${me.username}` : "—"}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-xs font-medium uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
                 Position
               </dt>
               <dd className="mt-1 text-zinc-900 dark:text-zinc-100">{me.position || "—"}</dd>
@@ -100,7 +117,16 @@ export default function UserProfilePage() {
             Failed to load profile.
           </p>
         )}
-      </Card>
+      </PageSection>
+
+      {me && (
+        <EditProfileModal
+          open={editModalOpen}
+          user={me}
+          onClose={() => setEditModalOpen(false)}
+          onSuccess={handleEditSuccess}
+        />
+      )}
     </UserPageLayout>
   )
 }

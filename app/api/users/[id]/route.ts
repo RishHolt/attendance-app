@@ -7,7 +7,6 @@ export type UserRow = {
   id: string
   userId: string
   fullName: string
-  username: string | null
   email: string
   contactNo: string | null
   position: string | null
@@ -23,7 +22,6 @@ export async function PATCH(
     const { id } = await params
     const body = (await _request.json()) as {
       fullName?: string
-      username?: string
       email?: string
       contactNo?: string
       position?: string
@@ -44,8 +42,6 @@ export async function PATCH(
     const updates: Record<string, unknown> = {}
     if (body.fullName !== undefined)
       updates.full_name = body.fullName.trim()
-    if (body.username !== undefined)
-      updates.username = body.username.trim() || null
     if (body.email !== undefined)
       updates.email = body.email.trim().toLowerCase()
     if (body.contactNo !== undefined) {
@@ -82,7 +78,7 @@ export async function PATCH(
     if (body.password?.trim()) {
       const { data: existingUser } = await supabase
         .from("users")
-        .select("email, full_name, username")
+        .select("email, full_name")
         .eq("id", id)
         .single()
       if (existingUser?.email) {
@@ -119,12 +115,6 @@ export async function PATCH(
               { status: 500 }
             )
           }
-          if (createdAuth?.user?.id && existingUser.username) {
-            await admin.from("profiles").upsert(
-              { id: createdAuth.user.id, username: existingUser.username },
-              { onConflict: "id" }
-            )
-          }
         }
         const passwordHash = await bcrypt.hash(body.password.trim(), 10)
         updates.password_hash = passwordHash
@@ -135,7 +125,6 @@ export async function PATCH(
       id: string
       user_id: string
       full_name: string
-      username: string | null
       email: string
       contact_no: string | null
       position: string | null
@@ -148,16 +137,13 @@ export async function PATCH(
         .from("users")
         .update(updates)
         .eq("id", id)
-        .select("id, user_id, full_name, username, email, contact_no, position, status, start_date")
+        .select("id, user_id, full_name, email, contact_no, position, status, start_date")
         .single()
       if (result.error) {
         if (result.error.code === "23505") {
           const detail = result.error.message.toLowerCase()
           if (detail.includes("email")) {
             return NextResponse.json({ error: "Email already exists" }, { status: 409 })
-          }
-          if (detail.includes("username")) {
-            return NextResponse.json({ error: "Username already exists" }, { status: 409 })
           }
         }
         return NextResponse.json(
@@ -169,7 +155,7 @@ export async function PATCH(
     } else {
       const result = await supabase
         .from("users")
-        .select("id, user_id, full_name, username, email, contact_no, position, status, start_date")
+        .select("id, user_id, full_name, email, contact_no, position, status, start_date")
         .eq("id", id)
         .single()
       if (result.error) {
@@ -189,7 +175,6 @@ export async function PATCH(
       id: data.id,
       userId: data.user_id,
       fullName: data.full_name,
-      username: data.username,
       email: data.email,
       contactNo: data.contact_no,
       position: data.position,

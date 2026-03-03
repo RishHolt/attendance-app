@@ -83,7 +83,7 @@ export const QrAttendanceModal = ({ open, onClose }: QrAttendanceModalProps) => 
         color: rgb(0.1, 0.1, 0.15),
       })
 
-      page.drawText("Scan to clock in", {
+      page.drawText("Scan to time in", {
         x: margin,
         y: height - margin - 52,
         size: 14,
@@ -131,7 +131,7 @@ export const QrAttendanceModal = ({ open, onClose }: QrAttendanceModalProps) => 
         color: rgb(0.45, 0.45, 0.5),
       })
 
-      page.drawText("3. Sign in if prompted, then you will clock in automatically", {
+      page.drawText("3. Sign in if prompted, then you will time in automatically", {
         x: margin,
         y: qrY - 76,
         size: 9,
@@ -182,7 +182,7 @@ export const QrAttendanceModal = ({ open, onClose }: QrAttendanceModalProps) => 
       open={open}
       onClose={onClose}
       title="QR Attendance"
-      description="Users scan this QR code to clock in."
+      description="Users scan this QR code to time in."
       footer={
         <div className="flex justify-end">
           <Button
@@ -202,7 +202,7 @@ export const QrAttendanceModal = ({ open, onClose }: QrAttendanceModalProps) => 
             <div className="bg-white dark:bg-zinc-800 p-4 border border-zinc-200 dark:border-zinc-700 rounded-xl">
               <img
                 src={qrDataUrl}
-                alt="QR code for clock in"
+                alt="QR code for time in"
                 width={256}
                 height={256}
                 className="rounded-lg"
@@ -226,7 +226,7 @@ export const QrAttendanceModal = ({ open, onClose }: QrAttendanceModalProps) => 
         </div>
         <p className="text-zinc-500 dark:text-zinc-400 text-sm text-center">
           Display this on a screen or print it. When users scan, they sign in (if
-          needed), clock in automatically, then go to their dashboard.
+          needed), time in automatically, then go to their dashboard.
         </p>
       </div>
     </Modal>

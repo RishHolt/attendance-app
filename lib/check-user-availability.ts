@@ -1,5 +1,5 @@
 export const checkUserAvailability = async (
-  field: "email" | "username" | "contactNo",
+  field: "email" | "contactNo",
   value: string,
   excludeId?: string
 ): Promise<{ available: boolean }> => {

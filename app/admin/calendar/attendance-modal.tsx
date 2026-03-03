@@ -10,7 +10,8 @@ export type AttendanceRow = {
   id: string
   userId: string
   date: string
-  status: "present" | "late" | "absent"
+  status: "present" | "late" | "absent" | "incomplete"
+  approvalStatus?: "pending" | "approved" | "denied"
   timeIn: string | null
   timeOut: string | null
 }
@@ -26,10 +27,11 @@ type AttendanceModalProps = {
   onSuccess?: () => void
 }
 
-const STATUS_OPTIONS: { value: "present" | "late" | "absent"; label: string }[] = [
+const STATUS_OPTIONS: { value: "present" | "late" | "absent" | "incomplete"; label: string }[] = [
   { value: "present", label: "Present" },
   { value: "late", label: "Late" },
   { value: "absent", label: "Absent" },
+  { value: "incomplete", label: "Incomplete" },
 ]
 
 export const AttendanceModal = ({
@@ -42,7 +44,7 @@ export const AttendanceModal = ({
   attendance,
   onSuccess,
 }: AttendanceModalProps) => {
-  const [status, setStatus] = useState<"present" | "late" | "absent">("present")
+  const [status, setStatus] = useState<"present" | "late" | "absent" | "incomplete">("present")
   const [timeIn, setTimeIn] = useState("")
   const [timeOut, setTimeOut] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -86,6 +88,12 @@ export const AttendanceModal = ({
         })
         const data = await res.json()
         if (!res.ok) {
+          if (res.status === 409 && String(data?.error ?? "").includes("already exists")) {
+            onSuccess?.()
+            onClose()
+            swal.info("Attendance already recorded for this date. Use the edit button to update it.")
+            return
+          }
           swal.error(data.error ?? "Failed to add attendance")
           return
         }

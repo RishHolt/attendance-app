@@ -1,11 +1,5 @@
-import type { Metadata } from "next"
-import { RegisterPageContent } from "./register-page-content"
-
-export const metadata: Metadata = {
-  title: "Register | Attendance",
-  description: "Create your attendance account",
-}
+import { redirect } from "next/navigation"
 
 export default function RegisterPage() {
-  return <RegisterPageContent />
+  redirect("/auth/login")
 }

@@ -12,13 +12,13 @@ export async function GET(request: Request) {
       return NextResponse.json({ available: true })
     }
 
-    const validFields = ["email", "username", "contactNo"]
+    const validFields = ["email", "contactNo"]
     if (!validFields.includes(field)) {
       return NextResponse.json({ error: "Invalid field" }, { status: 400 })
     }
 
     const dbColumn =
-      field === "contactNo" ? "contact_no" : field === "email" ? "email" : "username"
+      field === "contactNo" ? "contact_no" : "email"
     const searchValue = field === "email" ? value.toLowerCase() : value
 
     const supabase = await createClient()

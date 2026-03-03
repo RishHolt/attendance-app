@@ -110,7 +110,7 @@ export const QrClockInClient = () => {
           )
           if (!patchRes.ok) {
             const data = await patchRes.json()
-            setMessage(data.error ?? "Failed to clock in")
+            setMessage(data.error ?? "Failed to time in")
             setStatus("error")
             return
           }
@@ -126,7 +126,7 @@ export const QrClockInClient = () => {
           })
           if (!postRes.ok) {
             const data = await postRes.json()
-            setMessage(data.error ?? "Failed to clock in")
+            setMessage(data.error ?? "Failed to time in")
             setStatus("error")
             return
           }

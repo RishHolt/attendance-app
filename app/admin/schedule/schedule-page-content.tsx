@@ -11,7 +11,6 @@ type UserRow = {
   id: string
   userId: string
   fullName: string
-  username: string | null
   email: string
   contactNo: string | null
   position: string | null
@@ -68,7 +67,6 @@ export const SchedulePageContent = () => {
       return (
         u.fullName.toLowerCase().includes(q) ||
         u.email.toLowerCase().includes(q) ||
-        (u.username?.toLowerCase().includes(q) ?? false) ||
         (u.contactNo?.toLowerCase().includes(q) ?? false) ||
         (u.position?.toLowerCase().includes(q) ?? false)
       )

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import { CalendarRange, Loader2 } from "lucide-react"
 import { UserPageLayout } from "@/components/user/user-page-layout"
-import { Card } from "@/components/ui"
+import { PageSection } from "@/components/user/page-section"
 import { formatTime12 } from "@/lib/format-time"
 
 const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
@@ -51,9 +51,8 @@ export function SchedulePageContent() {
     <UserPageLayout
       title="Schedule"
       description="Your weekly work schedule"
-      showUserDetails={true}
     >
-      <Card variant="default" padding="md">
+      <PageSection title="Weekly schedule">
         {isLoading ? (
           <div className="flex flex-col items-center justify-center py-16">
             <Loader2 className="h-8 w-8 animate-spin text-zinc-400" aria-hidden />
@@ -114,7 +113,7 @@ export function SchedulePageContent() {
             </table>
           </div>
         )}
-      </Card>
+      </PageSection>
     </UserPageLayout>
   )
 }

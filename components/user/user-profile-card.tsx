@@ -9,7 +9,6 @@ type MeUser = {
   userId: string
   fullName: string
   email: string
-  username: string | null
   contactNo: string | null
   position: string | null
   startDate: string | null

@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { ChevronDown, ChevronLeft, ChevronRight, User, Plus, Pencil, Download } from "lucide-react"
+import { ChevronLeft, ChevronRight, Search, Plus, Pencil, Download } from "lucide-react"
 import { Button, Card } from "@/components/ui"
 import { PageHeader } from "@/components/admin/page-header"
 import { formatTime12 } from "@/lib/format-time"
@@ -15,7 +15,6 @@ type UserRow = {
   id: string
   userId: string
   fullName: string
-  username: string | null
   email: string
   contactNo: string | null
   position: string | null
@@ -49,6 +48,7 @@ const LEGENDS: { status: AttendanceStatus; label: string; color: string; bg: str
   { status: "present", label: "Present", color: "text-emerald-700 dark:text-emerald-400", bg: "bg-emerald-100 dark:bg-emerald-900/40" },
   { status: "late", label: "Late", color: "text-amber-700 dark:text-amber-400", bg: "bg-amber-100 dark:bg-amber-900/40" },
   { status: "absent", label: "Absent", color: "text-red-700 dark:text-red-400", bg: "bg-red-100 dark:bg-red-900/40" },
+  { status: "incomplete", label: "Incomplete", color: "text-orange-700 dark:text-orange-400", bg: "bg-orange-100 dark:bg-orange-900/40" },
   { status: "upcoming", label: "Upcoming", color: "text-violet-700 dark:text-violet-400", bg: "bg-violet-100 dark:bg-violet-900/40" },
   { status: "no-schedule", label: "No schedule", color: "text-zinc-500 dark:text-zinc-400", bg: "bg-zinc-100 dark:bg-zinc-800" },
 ]
@@ -137,15 +137,14 @@ export const CalendarPageContent = () => {
     attendance?: AttendanceRow | null
   } | null>(null)
   const [exportPdfModalOpen, setExportPdfModalOpen] = useState(false)
+  const [userSearch, setUserSearch] = useState("")
+  const [userDropdownOpen, setUserDropdownOpen] = useState(false)
 
   useEffect(() => {
     const load = async () => {
       setIsLoadingUsers(true)
       const data = await fetchUsers()
       setUsers(data)
-      if (data.length > 0) {
-        setSelectedUserId((prev) => prev || data[0].id)
-      }
       setIsLoadingUsers(false)
     }
     load()
@@ -158,22 +157,25 @@ export const CalendarPageContent = () => {
       return
     }
     let cancelled = false
+    setIsLoadingSchedules(true)
     const load = async () => {
-      setIsLoadingSchedules(true)
       const [schedData, attData] = await Promise.all([
         fetchUserSchedules(selectedUserId),
         (async () => {
           const year = currentDate.getFullYear()
           const month = currentDate.getMonth()
-          const first = new Date(year, month, 1)
-          const last = new Date(year, month + 1, 0)
-          const startPad = first.getDay()
-          const daysInMonth = last.getDate()
+          const firstOfMonth = new Date(year, month, 1)
+          const lastOfMonth = new Date(year, month + 1, 0)
+          const startPad = firstOfMonth.getDay()
+          const daysInMonth = lastOfMonth.getDate()
           const remaining = 42 - startPad - daysInMonth
           const firstVisible = new Date(year, month, 1 - startPad)
           const lastVisible = new Date(year, month + 1, remaining)
-          const from = `${firstVisible.getFullYear()}-${String(firstVisible.getMonth() + 1).padStart(2, "0")}-${String(firstVisible.getDate()).padStart(2, "0")}`
-          const to = `${lastVisible.getFullYear()}-${String(lastVisible.getMonth() + 1).padStart(2, "0")}-${String(lastVisible.getDate()).padStart(2, "0")}`
+          const pad = (n: number) => String(n).padStart(2, "0")
+          const from =
+            `${firstVisible.getFullYear()}-${pad(firstVisible.getMonth() + 1)}-${pad(firstVisible.getDate())}`
+          const to =
+            `${lastVisible.getFullYear()}-${pad(lastVisible.getMonth() + 1)}-${pad(lastVisible.getDate())}`
           return fetchAttendances(selectedUserId, from, to)
         })(),
       ])
@@ -211,10 +213,23 @@ export const CalendarPageContent = () => {
   const attendanceByDate = useMemo(() => {
     const map = new Map<string, AttendanceRow>()
     for (const a of attendances) {
-      map.set(a.date, a)
+      const key = typeof a.date === "string" ? a.date.slice(0, 10) : String(a.date).slice(0, 10)
+      map.set(key, a)
     }
     return map
   }, [attendances])
+
+  const filteredUsers = useMemo(() => {
+    const q = userSearch.toLowerCase().trim()
+    if (!q) return users
+    return users.filter(
+      (u) =>
+        u.fullName.toLowerCase().includes(q) ||
+        u.email.toLowerCase().includes(q) ||
+        (u.userId?.toLowerCase().includes(q) ?? false) ||
+        (u.contactNo?.toLowerCase().includes(q) ?? false)
+    )
+  }, [users, userSearch])
 
   const handleAttendanceSuccess = () => {
     if (!selectedUserId) return
@@ -310,6 +325,7 @@ export const CalendarPageContent = () => {
           ? deriveAttendanceStatus({
               hasSchedule: true,
               hasTimeIn: !!existingAttendance?.timeIn,
+              hasTimeOut: !!existingAttendance?.timeOut,
               scheduledTimeIn: schedule.timeIn,
               actualTimeIn: existingAttendance?.timeIn ?? null,
               dateStr,
@@ -446,6 +462,7 @@ export const CalendarPageContent = () => {
               ? deriveAttendanceStatus({
                   hasSchedule: true,
                   hasTimeIn: !!existingAttendance?.timeIn,
+                  hasTimeOut: !!existingAttendance?.timeOut,
                   scheduledTimeIn: schedule.timeIn,
                   actualTimeIn: existingAttendance?.timeIn ?? null,
                   dateStr,
@@ -514,10 +531,12 @@ export const CalendarPageContent = () => {
         let totalLate = 0
         let totalAbsent = 0
 
+        let totalIncomplete = 0
         for (const row of rows) {
           if (row.status === "Present") totalPresent++
           if (row.status === "Late") totalLate++
           if (row.status === "Absent") totalAbsent++
+          if (row.status === "Incomplete") totalIncomplete++
         }
 
         for (const date of daysToExport) {
@@ -526,10 +545,12 @@ export const CalendarPageContent = () => {
           const schedule =
             scheduleByDate.get(dateStr) ?? scheduleByDay.get(dayOfWeek)
           const existingAttendance = exportAttendanceByDate.get(dateStr)
+          const isApproved = existingAttendance?.approvalStatus === "approved"
           if (
             schedule &&
             existingAttendance?.timeIn &&
-            existingAttendance?.timeOut
+            existingAttendance?.timeOut &&
+            isApproved
           ) {
             const actualM = calcWorkMinutes(
               existingAttendance.timeIn,
@@ -552,6 +573,7 @@ export const CalendarPageContent = () => {
           totalPresent,
           totalLate,
           totalAbsent,
+          totalIncomplete,
         }
 
         const pdfBytes = await generateCalendarPdf({
@@ -638,66 +660,107 @@ export const CalendarPageContent = () => {
       />
 
       <Card variant="default" padding="none" className="min-w-0 p-4 md:p-6">
-        {selectedUserId && totalRegularMinutes > 0 && (
-          <div className="mb-6 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-2 lg:gap-4 rounded-xl border border-zinc-200/80 bg-zinc-50/50 px-4 py-3 dark:border-zinc-700/80 dark:bg-zinc-800/30">
-            <p className="text-sm font-medium text-zinc-600 dark:text-zinc-400">
-              Total hours this month
-            </p>
-            <p className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
-              {formatMinutesAsHours(totalRegularMinutes)}
-            </p>
-          </div>
-        )}
+        <div className="mb-6 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-2 lg:gap-4 rounded-xl border border-zinc-200/80 bg-zinc-50/50 px-4 py-3 dark:border-zinc-700/80 dark:bg-zinc-800/30">
+          <p className="text-sm font-medium text-zinc-600 dark:text-zinc-400">
+            Total hours this month
+          </p>
+          <p className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
+            {!selectedUserId
+              ? "—"
+              : isLoadingSchedules
+                ? "..."
+                : formatMinutesAsHours(totalRegularMinutes)}
+          </p>
+        </div>
         <div className="flex flex-col gap-4 lg:flex-row lg:justify-between lg:items-center lg:gap-6">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:gap-6 w-full lg:w-auto min-w-0">
-            <div className="flex flex-col gap-2 w-full lg:min-w-[200px]">
+          <div className="flex flex-1 flex-col gap-3 lg:flex-row lg:items-center lg:gap-6 w-full min-w-0">
+            <div className="flex flex-row items-center gap-3 w-full min-w-0 flex-1">
               <label
-                htmlFor="calendar-user-select"
-                className="flex items-center gap-2 font-medium text-zinc-700 dark:text-zinc-300 text-sm shrink-0"
+                htmlFor="calendar-user-search"
+                className="flex shrink-0 items-center gap-2 font-medium text-zinc-700 dark:text-zinc-300 text-sm"
               >
-                <User className="w-4 h-4 shrink-0" aria-hidden />
-                Select user
+                <Search className="w-4 h-4 shrink-0" aria-hidden />
+                Search user
               </label>
-              <div className="relative w-full min-w-0">
-                <select
-                  id="calendar-user-select"
-                  value={selectedUserId}
-                  onChange={(e) => setSelectedUserId(e.target.value)}
+              <div className="relative flex-1 min-w-0 w-full sm:min-w-[200px] md:min-w-[260px] lg:min-w-[320px]">
+                <input
+                  id="calendar-user-search"
+                  type="text"
+                  value={
+                    userDropdownOpen
+                      ? userSearch
+                      : selectedUserId
+                        ? (() => {
+                            const u = users.find((x) => x.id === selectedUserId)
+                            return u ? `${u.fullName} ID:${u.userId}` : ""
+                          })()
+                        : ""
+                  }
+                  onChange={(e) => {
+                    setUserSearch(e.target.value)
+                    setUserDropdownOpen(true)
+                  }}
+                  onFocus={() => {
+                    setUserDropdownOpen(true)
+                    if (!userSearch && selectedUserId) {
+                      const u = users.find((x) => x.id === selectedUserId)
+                      if (u) setUserSearch(`${u.fullName} ID:${u.userId}`)
+                    }
+                  }}
+                  onBlur={() =>
+                    setTimeout(() => setUserDropdownOpen(false), 150)
+                  }
+                  placeholder={isLoadingUsers ? "Loading…" : "Select or search user, id."}
                   disabled={isLoadingUsers}
-                  className="h-11 w-full min-h-[44px] appearance-none rounded-xl border border-zinc-200/80 bg-white pl-4 pr-12 py-2 text-sm font-medium text-zinc-900 transition-colors focus:border-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-400/20 disabled:opacity-50 dark:border-zinc-700/80 dark:bg-zinc-800/50 dark:text-zinc-100 dark:focus:border-zinc-500"
-                  aria-label="Select user"
-                >
-                  <option value="">
-                    {isLoadingUsers ? "Loading…" : "Choose a user"}
-                  </option>
-                  {users.map((u) => (
-                    <option key={u.id} value={u.id}>
-                      {u.fullName}
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown
-                  className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 shrink-0 text-zinc-500 dark:text-zinc-400"
-                  aria-hidden
+                  autoComplete="off"
+                  aria-label="Search user"
+                  aria-expanded={userDropdownOpen}
+                  aria-haspopup="listbox"
+                  className="h-11 w-full min-h-[44px] rounded-xl border border-zinc-200/80 bg-white pl-4 pr-4 py-2 text-sm font-medium text-zinc-900 transition-colors focus:border-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-400/20 disabled:opacity-50 dark:border-zinc-700/80 dark:bg-zinc-800/50 dark:text-zinc-100 dark:focus:border-zinc-500"
                 />
+                {userDropdownOpen && (
+                  <ul
+                    role="listbox"
+                    className="absolute left-0 right-0 top-full z-50 mt-1 max-h-60 overflow-auto rounded-xl border border-zinc-200 bg-white py-1 shadow-lg dark:border-zinc-700 dark:bg-zinc-800"
+                  >
+                    {isLoadingUsers ? (
+                      <li className="px-4 py-3 text-sm text-zinc-500 dark:text-zinc-400">
+                        Loading…
+                      </li>
+                    ) : filteredUsers.length === 0 ? (
+                      <li className="px-4 py-3 text-sm text-zinc-500 dark:text-zinc-400">
+                        No users found
+                      </li>
+                    ) : (
+                      filteredUsers.map((u) => (
+                        <li
+                          key={u.id}
+                          role="option"
+                          tabIndex={0}
+                          onMouseDown={(e) => {
+                            e.preventDefault()
+                            setSelectedUserId(u.id)
+                            setUserSearch("")
+                            setUserDropdownOpen(false)
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.preventDefault()
+                              setSelectedUserId(u.id)
+                              setUserSearch("")
+                              setUserDropdownOpen(false)
+                            }
+                          }}
+                          className="cursor-pointer px-4 py-2.5 text-sm text-zinc-900 hover:bg-zinc-100 dark:text-zinc-100 dark:hover:bg-zinc-700"
+                        >
+                          {u.fullName} ID:{u.userId}
+                        </li>
+                      ))
+                    )}
+                  </ul>
+                )}
               </div>
             </div>
-            {selectedUserId && (() => {
-              const u = users.find((x) => x.id === selectedUserId)
-              if (!u) return null
-              const extras = [u.position, u.userId && `ID: ${u.userId}`].filter(Boolean).join(" • ")
-              const fullLine = extras ? `${u.email} • ${extras}` : u.email
-              return (
-                <div className="min-w-0 max-w-full lg:max-w-[220px]">
-                  <p
-                    className="truncate text-sm text-zinc-600 dark:text-zinc-400"
-                    title={fullLine}
-                  >
-                    {fullLine}
-                  </p>
-                </div>
-              )
-            })()}
           </div>
 
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:gap-4 min-w-0">
@@ -774,6 +837,7 @@ export const CalendarPageContent = () => {
                     ? deriveAttendanceStatus({
                         hasSchedule: true,
                         hasTimeIn: !!existingAttendance?.timeIn,
+                        hasTimeOut: !!existingAttendance?.timeOut,
                         scheduledTimeIn: schedule.timeIn,
                         actualTimeIn: existingAttendance?.timeIn ?? null,
                         dateStr,
@@ -783,12 +847,12 @@ export const CalendarPageContent = () => {
                       })
                     : "no-schedule"
                 const status: AttendanceStatus =
-                  existingAttendance?.status === "absent" && !existingAttendance?.timeIn
-                    ? "absent"
-                    : existingAttendance?.status === "late"
-                      ? "late"
-                      : existingAttendance && !hasSchedule
-                        ? (existingAttendance.status as AttendanceStatus)
+                  !hasSchedule
+                    ? "no-schedule"
+                    : existingAttendance?.status === "absent" && !existingAttendance?.timeIn
+                      ? "absent"
+                      : existingAttendance?.status === "late"
+                        ? "late"
                         : derivedStatus
                 const dateKey = `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`
                 const isToday = dateKey === todayKey
@@ -829,7 +893,7 @@ export const CalendarPageContent = () => {
                       >
                         {date.getDate()}
                       </span>
-                      {selectedUserId && (
+                      {selectedUserId && hasSchedule && !isLoadingSchedules && (
                         <div className="flex items-center gap-0.5">
                           {!existingAttendance && (
                             <button
@@ -904,44 +968,6 @@ export const CalendarPageContent = () => {
                               </p>
                             )}
                           </div>
-                        ) : existingAttendance ? (
-                          <div className="space-y-0.5 text-xs">
-                            {existingAttendance.timeIn ? (
-                              <>
-                                <p className="text-zinc-600 dark:text-zinc-400 leading-tight">
-                                  <span className="font-medium text-zinc-500 dark:text-zinc-500">Time in: </span>
-                                  {formatTime12(existingAttendance.timeIn)}
-                                </p>
-                                <p className="text-zinc-600 dark:text-zinc-400 leading-tight">
-                                  <span className="font-medium text-zinc-500 dark:text-zinc-500">Time out: </span>
-                                  {existingAttendance.timeOut
-                                    ? formatTime12(existingAttendance.timeOut)
-                                    : "—"}
-                                </p>
-                                {(existingAttendance.timeIn && existingAttendance.timeOut) && (
-                                  <p className="text-zinc-600 dark:text-zinc-400 leading-tight font-medium">
-                                    <span className="font-medium text-zinc-500 dark:text-zinc-500">Total: </span>
-                                    {formatTotalWithOvertime(
-                                      calcWorkMinutes(
-                                        existingAttendance.timeIn,
-                                        existingAttendance.timeOut,
-                                        0
-                                      ),
-                                      calcWorkMinutes(
-                                        existingAttendance.timeIn,
-                                        existingAttendance.timeOut,
-                                        0
-                                      )
-                                    )}
-                                  </p>
-                                )}
-                              </>
-                            ) : (
-                              <p className="text-zinc-400 dark:text-zinc-500 italic leading-tight">
-                                No time recorded
-                              </p>
-                            )}
-                          </div>
                         ) : (
                           <p className="text-zinc-400 dark:text-zinc-500 text-xs italic leading-tight">
                             No schedule
@@ -949,10 +975,12 @@ export const CalendarPageContent = () => {
                         )}
                         <span
                           className={`inline-flex rounded-md px-2 py-0.5 text-xs font-medium ${
-                            LEGENDS.find((l) => l.status === status)?.bg ?? ""
-                          } ${LEGENDS.find((l) => l.status === status)?.color ?? ""}`}
+                            isLoadingSchedules
+                              ? "bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400"
+                              : LEGENDS.find((l) => l.status === status)?.bg ?? ""
+                          } ${isLoadingSchedules ? "" : LEGENDS.find((l) => l.status === status)?.color ?? ""}`}
                         >
-                          {status === "no-schedule"
+                          {isLoadingSchedules || status === "no-schedule"
                             ? "—"
                             : status.charAt(0).toUpperCase() + status.slice(1)}
                         </span>

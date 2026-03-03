@@ -74,7 +74,6 @@ async function seed() {
     full_name: name,
     email: `seed-${i + 1}-${runId}@example.com`,
     user_id: ensureUniqueUserId(),
-    username: `seed${i + 1}_${runId}`,
     position: POSITIONS[i % POSITIONS.length],
     status: "active" as const,
     start_date: "2024-01-15",

@@ -16,4 +16,4 @@ export const getSystemTheme = (): Theme =>
     : "light"
 
 export const getInitialTheme = (): Theme =>
-  getStoredTheme() ?? getSystemTheme()
+  getStoredTheme() ?? "light"

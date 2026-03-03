@@ -1,50 +1,38 @@
 import { NextResponse } from "next/server"
-import { createAdminClient } from "@/lib/supabase/admin"
 import { createClient } from "@/lib/supabase/server"
 
 const isEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
 
-const resolveEmailFromLogin = async (login: string): Promise<string | null> => {
-  const trimmed = login.trim()
+const resolveEmailFromLogin = (login: string): string | null => {
+  const trimmed = login.trim().toLowerCase()
   if (isEmail(trimmed)) return trimmed
-
   const localAdminEmail = process.env.LOCAL_ADMIN_EMAIL?.trim()
   const localAdminUsername = process.env.LOCAL_ADMIN_USERNAME?.trim()
   if (
     localAdminEmail &&
     localAdminUsername &&
-    trimmed.toLowerCase() === localAdminUsername.toLowerCase()
+    trimmed === localAdminUsername.toLowerCase()
   ) {
     return localAdminEmail
   }
-
-  const admin = createAdminClient()
-
-  const { data: profile } = await admin
-    .from("profiles")
-    .select("id")
-    .ilike("username", trimmed)
-    .maybeSingle()
-
-  if (profile?.id) {
-    const {
-      data: { user },
-    } = await admin.auth.admin.getUserById(profile.id)
-    if (user?.email) return user.email
-  }
-
-  const { data: userRow } = await admin
-    .from("users")
-    .select("email")
-    .ilike("username", trimmed)
-    .maybeSingle()
-
-  return userRow?.email ?? null
+  return null
 }
+
+const isJsonRequest = (request: Request) =>
+  request.headers.get("x-requested-with") === "XMLHttpRequest" ||
+  request.headers.get("accept")?.includes("application/json")
 
 export async function POST(request: Request) {
   const loginUrl = new URL("/auth/login", request.url)
-  const adminUrl = new URL("/admin", request.url)
+  const jsonResponse = isJsonRequest(request)
+
+  const respondError = (message: string, status = 400) => {
+    if (jsonResponse) {
+      return NextResponse.json({ error: message }, { status })
+    }
+    loginUrl.searchParams.set("error", message)
+    return NextResponse.redirect(loginUrl.toString(), { status: 302 })
+  }
 
   try {
     const formData = await request.formData()
@@ -52,32 +40,19 @@ export async function POST(request: Request) {
     const password = formData.get("password")?.toString() ?? ""
 
     if (!login) {
-      loginUrl.searchParams.set("error", "Email or username is required")
-      return NextResponse.redirect(loginUrl, { status: 302 })
+      return respondError("Email is required")
     }
 
     if (!password) {
-      loginUrl.searchParams.set("error", "Password is required")
-      return NextResponse.redirect(loginUrl, { status: 302 })
+      return respondError("Password is required")
     }
 
-    let email: string | null
     const isLocalAdminLogin =
-      process.env.LOCAL_ADMIN_USERNAME?.trim().toLowerCase() === login.toLowerCase()
-    try {
-      email = await resolveEmailFromLogin(login)
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "Configuration error"
-      if (message.includes("required") || message.includes(".env")) {
-        loginUrl.searchParams.set("error", "Server not configured")
-        return NextResponse.redirect(loginUrl, { status: 302 })
-      }
-      throw err
-    }
+      process.env.LOCAL_ADMIN_USERNAME?.trim().toLowerCase() === login.trim().toLowerCase()
+    const email = resolveEmailFromLogin(login)
 
     if (!email) {
-      loginUrl.searchParams.set("error", "Invalid email or username")
-      return NextResponse.redirect(loginUrl, { status: 302 })
+      return respondError("Invalid email")
     }
 
     const supabase = await createClient()
@@ -87,13 +62,11 @@ export async function POST(request: Request) {
     })
 
     if (error) {
-      loginUrl.searchParams.set("error", error.message)
-      return NextResponse.redirect(loginUrl, { status: 302 })
+      return respondError(error.message, 401)
     }
 
     if (!data.user) {
-      loginUrl.searchParams.set("error", "Sign in failed")
-      return NextResponse.redirect(loginUrl, { status: 302 })
+      return respondError("Sign in failed")
     }
 
     const localAdminEmail = process.env.LOCAL_ADMIN_EMAIL?.trim()
@@ -121,9 +94,11 @@ export async function POST(request: Request) {
         ? new URL(returnTo, redirectBase)
         : new URL("/user", redirectBase)
 
+    if (jsonResponse) {
+      return NextResponse.json({ redirect: redirectUrl.toString() })
+    }
     return NextResponse.redirect(redirectUrl.toString(), { status: 302 })
   } catch (err) {
-    loginUrl.searchParams.set("error", "Sign in failed. Please try again.")
-    return NextResponse.redirect(loginUrl, { status: 302 })
+    return respondError("Sign in failed. Please try again.", 500)
   }
 }

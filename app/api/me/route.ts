@@ -11,7 +11,7 @@ export async function GET() {
 
     const { data: userRow } = await supabase
       .from("users")
-      .select("id, user_id, full_name, email, username, contact_no, position, start_date")
+      .select("id, user_id, full_name, email, contact_no, position, start_date")
       .eq("email", user.email.toLowerCase())
       .maybeSingle()
 
@@ -25,7 +25,6 @@ export async function GET() {
       userId: row.user_id,
       fullName: row.full_name,
       email: row.email,
-      username: row.username,
       contactNo: row.contact_no ?? null,
       position: row.position ?? null,
       startDate: row.start_date ?? null,

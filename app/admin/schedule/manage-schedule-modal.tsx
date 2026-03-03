@@ -11,7 +11,6 @@ type UserRow = {
   id: string
   userId: string
   fullName: string
-  username: string | null
   email: string
   contactNo: string | null
   position: string | null

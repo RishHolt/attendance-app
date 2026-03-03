@@ -599,7 +599,7 @@ export const DashboardPageContent = () => {
                               Approve
                             </Button>
                           ) : (
-                            <span className="text-xs text-zinc-400 dark:text-zinc-500">Awaiting clock out</span>
+                            <span className="text-xs text-zinc-400 dark:text-zinc-500">Awaiting time out</span>
                           )}
                           <Button
                             variant="secondary"
@@ -649,7 +649,7 @@ export const DashboardPageContent = () => {
                 No attendance records today
               </h3>
               <p className="mt-2 max-w-sm text-sm text-zinc-500 dark:text-zinc-400">
-                Attendance will appear here when employees clock in.
+                Attendance will appear here when employees time in.
               </p>
             </div>
           ) : (

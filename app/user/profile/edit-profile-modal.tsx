@@ -1,10 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Modal } from "@/components/ui/modal"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { PasswordInput } from "@/components/ui/password-input"
+import { Modal, Button, Input, PasswordInput } from "@/components/ui"
 import { swal } from "@/lib/swal"
 import {
   validateFullName,
@@ -19,30 +16,29 @@ import { useDebounce } from "@/lib/use-debounce"
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
-type UserRow = {
+type MeUser = {
   id: string
   userId: string
   fullName: string
   email: string
   contactNo: string | null
   position: string | null
-  status: "active" | "inactive"
   startDate: string | null
 }
 
-type EditUserModalProps = {
+type EditProfileModalProps = {
   open: boolean
-  user: UserRow | null
+  user: MeUser | null
   onClose: () => void
   onSuccess?: () => void
 }
 
-export const EditUserModal = ({
+export const EditProfileModal = ({
   open,
   user,
   onClose,
   onSuccess,
-}: EditUserModalProps) => {
+}: EditProfileModalProps) => {
   const [fullName, setFullName] = useState("")
   const [email, setEmail] = useState("")
   const [contactNo, setContactNo] = useState("")
@@ -241,17 +237,17 @@ export const EditUserModal = ({
       })
       const data = await res.json()
       if (!res.ok) {
-        const errMsg = data.error ?? "Failed to update user"
+        const errMsg = data.error ?? "Failed to update profile"
         setServerErrorField(getErrorField(errMsg))
         setServerErrorMessage(errMsg)
         swal.error(errMsg)
         return
       }
-      await swal.success("User updated successfully")
+      await swal.success("Profile updated successfully")
       onClose()
       onSuccess?.()
     } catch {
-      swal.error("Failed to update user")
+      swal.error("Failed to update profile")
     } finally {
       setIsSubmitting(false)
     }
@@ -261,8 +257,8 @@ export const EditUserModal = ({
     <Modal
       open={open}
       onClose={handleClose}
-      title="Edit user"
-      description="Update user details"
+      title="Edit profile"
+      description="Update your profile details"
       footer={
         <div className="flex gap-3">
           <Button
@@ -276,7 +272,7 @@ export const EditUserModal = ({
           </Button>
           <Button
             type="submit"
-            form="edit-user-form"
+            form="edit-profile-form"
             className="flex-1"
             disabled={isSubmitting || !hasChanges}
           >
@@ -286,7 +282,7 @@ export const EditUserModal = ({
       }
     >
       <form
-        id="edit-user-form"
+        id="edit-profile-form"
         onSubmit={handleSubmit}
         className="flex flex-col gap-5"
       >

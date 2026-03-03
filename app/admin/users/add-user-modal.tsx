@@ -9,7 +9,6 @@ import { swal } from "@/lib/swal"
 import {
   validateFullName,
   validateEmail,
-  validateUsername,
   validateContactNo,
   validatePassword,
   validatePosition,
@@ -28,7 +27,6 @@ type AddUserModalProps = {
 
 export const AddUserModal = ({ open, onClose, onSuccess }: AddUserModalProps) => {
   const [fullName, setFullName] = useState("")
-  const [username, setUsername] = useState("")
   const [email, setEmail] = useState("")
   const [contactNo, setContactNo] = useState("")
   const [position, setPosition] = useState("")
@@ -37,16 +35,14 @@ export const AddUserModal = ({ open, onClose, onSuccess }: AddUserModalProps) =>
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [availabilityErrors, setAvailabilityErrors] = useState<Record<string, string>>({})
-  const [serverErrorField, setServerErrorField] = useState<"email" | "username" | "contactNo" | "password" | null>(null)
+  const [serverErrorField, setServerErrorField] = useState<"email" | "contactNo" | "password" | null>(null)
   const [serverErrorMessage, setServerErrorMessage] = useState("")
 
   const debouncedEmail = useDebounce(email, 400)
-  const debouncedUsername = useDebounce(username, 400)
   const debouncedContactNo = useDebounce(contactNo, 400)
 
   const resetForm = () => {
     setFullName("")
-    setUsername("")
     setEmail("")
     setContactNo("")
     setPosition("")
@@ -58,30 +54,28 @@ export const AddUserModal = ({ open, onClose, onSuccess }: AddUserModalProps) =>
     setServerErrorMessage("")
   }
 
-  const getErrorField = (message: string): "email" | "username" | "contactNo" | "password" | null => {
+  const getErrorField = (message: string): "email" | "contactNo" | "password" | null => {
     const lower = message.toLowerCase()
     if (lower.includes("email")) return "email"
-    if (lower.includes("username")) return "username"
     if (lower.includes("contact")) return "contactNo"
     if (lower.includes("password")) return "password"
     return null
   }
 
-  const getFieldError = (field: "fullName" | "email" | "username" | "contactNo" | "position" | "password" | "confirmPassword") => {
+  const getFieldError = (field: "fullName" | "email" | "contactNo" | "position" | "password" | "confirmPassword") => {
     if (serverErrorField === field) return serverErrorMessage
     if (availabilityErrors[field]) return availabilityErrors[field]
     return fieldErrors[field] ?? undefined
   }
 
   const validateField = (
-    field: "fullName" | "email" | "username" | "contactNo" | "position" | "password" | "confirmPassword",
+    field: "fullName" | "email" | "contactNo" | "position" | "password" | "confirmPassword",
     value: string,
     confirmValue?: string
   ) => {
     let err: string | null = null
     if (field === "fullName") err = validateFullName(value)
     else if (field === "email") err = validateEmail(value)
-    else if (field === "username") err = validateUsername(value)
     else if (field === "contactNo") err = validateContactNo(value)
     else if (field === "position") err = validatePosition(value)
     else if (field === "password") err = validatePassword(value)
@@ -96,7 +90,7 @@ export const AddUserModal = ({ open, onClose, onSuccess }: AddUserModalProps) =>
   }
 
   useEffect(() => {
-    const check = async (field: "email" | "username" | "contactNo", value: string) => {
+    const check = async (field: "email" | "contactNo", value: string) => {
       const trimmed = value.trim()
       if (!trimmed) {
         setAvailabilityErrors((prev) => {
@@ -107,7 +101,6 @@ export const AddUserModal = ({ open, onClose, onSuccess }: AddUserModalProps) =>
         return
       }
       if (field === "email" && !EMAIL_REGEX.test(trimmed)) return
-      if (field === "username" && trimmed.length < 3) return
       try {
         const { available } = await checkUserAvailability(field, value)
         setAvailabilityErrors((prev) => {
@@ -115,7 +108,6 @@ export const AddUserModal = ({ open, onClose, onSuccess }: AddUserModalProps) =>
           if (available) delete next[field]
           else {
             if (field === "email") next[field] = "Email already exists"
-            else if (field === "username") next[field] = "Username already exists"
             else next[field] = "Contact no already exists"
           }
           return next
@@ -130,41 +122,6 @@ export const AddUserModal = ({ open, onClose, onSuccess }: AddUserModalProps) =>
     }
     check("email", debouncedEmail)
   }, [debouncedEmail])
-
-  useEffect(() => {
-    const check = async (field: "email" | "username" | "contactNo", value: string) => {
-      const trimmed = value.trim()
-      if (!trimmed) {
-        setAvailabilityErrors((prev) => {
-          const next = { ...prev }
-          delete next[field]
-          return next
-        })
-        return
-      }
-      if (field === "username" && trimmed.length < 3) return
-      try {
-        const { available } = await checkUserAvailability(field, value)
-        setAvailabilityErrors((prev) => {
-          const next = { ...prev }
-          if (available) delete next[field]
-          else {
-            if (field === "email") next[field] = "Email already exists"
-            else if (field === "username") next[field] = "Username already exists"
-            else next[field] = "Contact no already exists"
-          }
-          return next
-        })
-      } catch {
-        setAvailabilityErrors((prev) => {
-          const next = { ...prev }
-          delete next[field]
-          return next
-        })
-      }
-    }
-    check("username", debouncedUsername)
-  }, [debouncedUsername])
 
   useEffect(() => {
     const check = async (field: "contactNo", value: string) => {
@@ -210,7 +167,6 @@ export const AddUserModal = ({ open, onClose, onSuccess }: AddUserModalProps) =>
     const validationErrors = validateUserForm({
       fullName,
       email,
-      username,
       contactNo,
       position,
       password,
@@ -230,7 +186,6 @@ export const AddUserModal = ({ open, onClose, onSuccess }: AddUserModalProps) =>
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           fullName,
-          username,
           email,
           contactNo,
           position,
@@ -319,19 +274,6 @@ export const AddUserModal = ({ open, onClose, onSuccess }: AddUserModalProps) =>
             error={getFieldError("email")}
           />
         </div>
-        <Input
-          label="Username"
-          placeholder="jane.doe"
-          value={username}
-          onChange={(e) => {
-            setUsername(e.target.value)
-            setServerErrorField((prev) => (prev === "username" ? null : prev))
-            validateField("username", e.target.value)
-          }}
-          onBlur={(e) => validateField("username", e.target.value)}
-          required
-          error={getFieldError("username")}
-        />
         <Input
           label="Contact no"
           placeholder="e.g. 09171234567"
