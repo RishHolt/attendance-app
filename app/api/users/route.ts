@@ -2,17 +2,10 @@ import { NextResponse } from "next/server"
 import bcrypt from "bcryptjs"
 import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
+import { requireAdmin } from "@/lib/auth"
+import type { UserRow } from "@/types"
 
-export type UserRow = {
-  id: string
-  userId: string
-  fullName: string
-  email: string
-  contactNo: string | null
-  position: string | null
-  status: "active" | "inactive"
-  startDate: string | null
-}
+export type { UserRow }
 
 const generateUserId = (): string =>
   String(Math.floor(Math.random() * 89999999) + 10000000)
@@ -20,6 +13,9 @@ const generateUserId = (): string =>
 export async function GET() {
   try {
     const supabase = await createClient()
+    const unauthorized = await requireAdmin(supabase)
+    if (unauthorized) return unauthorized
+
     const withStartDate = await supabase
       .from("users")
       .select("id, user_id, full_name, email, contact_no, position, status, start_date")
@@ -62,6 +58,10 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
+    const supabase = await createClient()
+    const unauthorized = await requireAdmin(supabase)
+    if (unauthorized) return unauthorized
+
     const body = await request.json()
     const { fullName, email, contactNo, position, password } = body as {
       fullName?: string
@@ -143,7 +143,6 @@ export async function POST(request: Request) {
     }
 
     const admin = createAdminClient()
-    const supabase = await createClient()
     const maxRetries = 5
     let lastError: { message: string; code?: string } | null = null
 

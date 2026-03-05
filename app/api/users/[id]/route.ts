@@ -2,17 +2,10 @@ import { NextResponse } from "next/server"
 import bcrypt from "bcryptjs"
 import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
+import { requireAdmin } from "@/lib/auth"
+import type { UserRow } from "@/types"
 
-export type UserRow = {
-  id: string
-  userId: string
-  fullName: string
-  email: string
-  contactNo: string | null
-  position: string | null
-  status: "active" | "inactive"
-  startDate: string | null
-}
+export type { UserRow }
 
 export async function PATCH(
   _request: Request,
@@ -20,6 +13,10 @@ export async function PATCH(
 ) {
   try {
     const { id } = await params
+    const supabase = await createClient()
+    const unauthorized = await requireAdmin(supabase)
+    if (unauthorized) return unauthorized
+
     const body = (await _request.json()) as {
       fullName?: string
       email?: string
@@ -72,8 +69,6 @@ export async function PATCH(
     if (Object.keys(updates).length === 0 && !body.password?.trim()) {
       return NextResponse.json({ error: "No updates provided" }, { status: 400 })
     }
-
-    const supabase = await createClient()
 
     if (body.password?.trim()) {
       const { data: existingUser } = await supabase

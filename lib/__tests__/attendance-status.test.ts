@@ -3,16 +3,15 @@ import { deriveAttendanceStatus } from "../attendance-status"
 import { isLate } from "../time-calc"
 
 describe("isLate", () => {
-  it("returns false when clock in within 15 min of scheduled", () => {
+  it("returns false when clock in within 1 hour of scheduled", () => {
     expect(isLate("08:00", "08:00")).toBe(false)
     expect(isLate("08:10", "08:00")).toBe(false)
-    expect(isLate("08:15", "08:00")).toBe(false)
+    expect(isLate("08:59", "08:00")).toBe(false)
   })
 
-  it("returns true when clock in more than 15 min after scheduled", () => {
-    expect(isLate("08:16", "08:00")).toBe(true)
-    expect(isLate("09:00", "08:00")).toBe(true)
-    expect(isLate("08:30", "08:00")).toBe(true)
+  it("returns true when clock in more than 1 hour after scheduled", () => {
+    expect(isLate("09:01", "08:00")).toBe(true)
+    expect(isLate("09:30", "08:00")).toBe(true)
   })
 
   it("returns false when clock in before scheduled", () => {
@@ -42,7 +41,7 @@ describe("deriveAttendanceStatus", () => {
     ).toBe("no-schedule")
   })
 
-  it("returns present when has time-in, time-out and within 15 min of scheduled", () => {
+  it("returns present when has time-in, time-out and within 1 hour of scheduled", () => {
     expect(
       deriveAttendanceStatus({
         hasSchedule: true,
@@ -58,14 +57,14 @@ describe("deriveAttendanceStatus", () => {
     ).toBe("present")
   })
 
-  it("returns late when has time-in, time-out and more than 15 min after scheduled", () => {
+  it("returns late when has time-in, time-out and more than 1 hour after scheduled", () => {
     expect(
       deriveAttendanceStatus({
         hasSchedule: true,
         hasTimeIn: true,
         hasTimeOut: true,
         scheduledTimeIn,
-        actualTimeIn: "08:20",
+        actualTimeIn: "09:30",
         dateStr: todayStr,
         todayStr,
         tomorrowStr,

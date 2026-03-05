@@ -51,10 +51,10 @@ export function calcWorkMinutes(
 }
 
 /**
- * Late if actual time-in is more than 15 minutes after scheduled time-in
+ * Late if actual time-in is more than 1 hour (60 minutes) after scheduled time-in
  */
 export function isLate(actualTimeIn: string, scheduledTimeIn: string): boolean {
   const actualM = parseTimeToMinutes(actualTimeIn)
   const schedM = parseTimeToMinutes(scheduledTimeIn)
-  return actualM - schedM > 15
+  return actualM - schedM > 60
 }

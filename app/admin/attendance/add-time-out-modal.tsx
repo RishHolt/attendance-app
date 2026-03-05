@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { Modal, Button, Input } from "@/components/ui"
-import type { AdminAttendanceRow } from "@/app/api/attendances/route"
+import type { AdminAttendanceRow } from "@/types"
 
 type AddTimeOutModalProps = {
   open: boolean

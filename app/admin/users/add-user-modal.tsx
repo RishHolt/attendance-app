@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input"
 import { PasswordInput } from "@/components/ui/password-input"
 import { swal } from "@/lib/swal"
 import {
+  isEmail,
   validateFullName,
   validateEmail,
   validateContactNo,
@@ -16,8 +17,6 @@ import {
 } from "@/lib/user-form-validation"
 import { checkUserAvailability } from "@/lib/check-user-availability"
 import { useDebounce } from "@/lib/use-debounce"
-
-const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 type AddUserModalProps = {
   open: boolean
@@ -100,7 +99,7 @@ export const AddUserModal = ({ open, onClose, onSuccess }: AddUserModalProps) =>
         })
         return
       }
-      if (field === "email" && !EMAIL_REGEX.test(trimmed)) return
+      if (field === "email" && !isEmail(trimmed)) return
       try {
         const { available } = await checkUserAvailability(field, value)
         setAvailabilityErrors((prev) => {

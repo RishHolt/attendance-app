@@ -52,8 +52,13 @@ export const RequestCorrectionModal = ({
     const ti = requestedTimeIn.trim()
     const to = requestedTimeOut.trim()
     const reasonTrimmed = reason.trim()
-    if (!ti && !to) {
+    const hasTimeOut = !!row.timeOut
+    if (hasTimeOut && !ti && !to) {
       setError("Please provide at least time in or time out")
+      return
+    }
+    if (!hasTimeOut && !ti) {
+      setError("Please provide the correct time in")
       return
     }
     if (!reasonTrimmed) {
@@ -69,7 +74,7 @@ export const RequestCorrectionModal = ({
         body: JSON.stringify({
           attendanceId: row.id,
           requestedTimeIn: ti || undefined,
-          requestedTimeOut: to || undefined,
+          requestedTimeOut: hasTimeOut ? (to || undefined) : undefined,
           reason: reasonTrimmed,
         }),
       })
@@ -117,7 +122,11 @@ export const RequestCorrectionModal = ({
           <Button
             onClick={handleSubmit}
             isLoading={isSubmitting}
-            disabled={isSubmitting || !reason.trim()}
+            disabled={
+              isSubmitting ||
+              !reason.trim() ||
+              (row && !row.timeOut && !requestedTimeIn.trim())
+            }
           >
             Submit request
           </Button>
@@ -140,21 +149,17 @@ export const RequestCorrectionModal = ({
             </p>
           )}
         </div>
-        <div>
-          <Input
-            type="time"
-            label="Correct time out"
-            value={requestedTimeOut}
-            onChange={(e) => setRequestedTimeOut(e.target.value)}
-            disabled={isSubmitting}
-            aria-describedby={row?.timeOut ? undefined : "time-out-hint"}
-          />
-          {row && !row.timeOut && (
-            <p id="time-out-hint" className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-              Leave empty if you have not timed out yet
-            </p>
-          )}
-        </div>
+        {row?.timeOut != null && row.timeOut !== "" && (
+          <div>
+            <Input
+              type="time"
+              label="Correct time out"
+              value={requestedTimeOut}
+              onChange={(e) => setRequestedTimeOut(e.target.value)}
+              disabled={isSubmitting}
+            />
+          </div>
+        )}
         <Input
           label="Reason"
           placeholder="e.g. Forgot to time out"

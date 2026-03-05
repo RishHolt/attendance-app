@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { formatTime24 } from "@/lib/format-time"
 import { deriveStatusFromTimes } from "@/lib/attendance-status"
 
 async function hasScheduleForDate(
@@ -40,15 +41,6 @@ async function getScheduledTimeInForDate(
   const s = String(timeIn)
   const parts = s.split(":")
   const h = (parts[0] ?? "09").padStart(2, "0")
-  const m = (parts[1] ?? "00").padStart(2, "0")
-  return `${h}:${m}`
-}
-
-function formatTime(v: string | null): string {
-  if (!v) return "00:00"
-  const s = String(v)
-  const parts = s.split(":")
-  const h = (parts[0] ?? "00").padStart(2, "0")
   const m = (parts[1] ?? "00").padStart(2, "0")
   return `${h}:${m}`
 }
@@ -158,8 +150,8 @@ export async function PATCH(
           updates.time_out !== undefined
             ? (updates.time_out as string | null)
             : existing.time_out
-        const ti = mergedTimeIn ? formatTime(mergedTimeIn) : null
-        const to = mergedTimeOut ? formatTime(mergedTimeOut) : null
+        const ti = mergedTimeIn ? formatTime24(mergedTimeIn) : null
+        const to = mergedTimeOut ? formatTime24(mergedTimeOut) : null
         if (ti || to) {
           const scheduledTimeIn = await getScheduledTimeInForDate(
             supabase,
@@ -193,8 +185,8 @@ export async function PATCH(
       date: data.attendance_date,
       status: data.status,
       approvalStatus: data.approval_status ?? "pending",
-      timeIn: data.time_in ? formatTime(data.time_in) : null,
-      timeOut: data.time_out ? formatTime(data.time_out) : null,
+      timeIn: data.time_in ? formatTime24(data.time_in) : null,
+      timeOut: data.time_out ? formatTime24(data.time_out) : null,
       remarks: data.remarks ?? null,
     })
   } catch (err) {

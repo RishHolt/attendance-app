@@ -32,6 +32,13 @@ import {
 import { PageHeader } from "@/components/admin/page-header"
 import { Button, Card, Input } from "@/components/ui"
 
+type DayBreakdown = {
+  date: string
+  present: { fullName: string; userDisplayId: string }[]
+  late: { fullName: string; userDisplayId: string }[]
+  absent: { fullName: string; userDisplayId: string }[]
+}
+
 type AnalyticsData = {
   overview: {
     totalPresent: number
@@ -47,6 +54,7 @@ type AnalyticsData = {
   }
   approvalBreakdown: { pending: number; approved: number; denied: number }
   dailyTrend: { date: string; present: number; late: number; absent: number }[]
+  dailyBreakdown?: DayBreakdown[]
   perUser: {
     userId: string
     present: number
@@ -60,6 +68,16 @@ type AnalyticsData = {
 const formatDate = (s: string) => {
   const d = new Date(s + "T12:00:00")
   return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+}
+
+const formatDateWithWeekday = (s: string) => {
+  const d = new Date(s + "T12:00:00")
+  return d.toLocaleDateString("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  })
 }
 
 const formatShortDate = (s: string) => {
@@ -129,6 +147,11 @@ export const AnalyticsPageContent = () => {
   const [from, setFrom] = useState(defaultFrom)
   const [to, setTo] = useState(defaultTo)
   const [employeePage, setEmployeePage] = useState(1)
+  const [whoByDayTab, setWhoByDayTab] = useState<"present" | "absent">("present")
+  const [whoByDayFrom, setWhoByDayFrom] = useState(defaultFrom)
+  const [whoByDayTo, setWhoByDayTo] = useState(defaultTo)
+  const [whoByDayData, setWhoByDayData] = useState<{ dailyBreakdown: DayBreakdown[] } | null>(null)
+  const [whoByDayLoading, setWhoByDayLoading] = useState(false)
 
   const EMPLOYEES_PER_PAGE = 10
 
@@ -156,12 +179,34 @@ export const AnalyticsPageContent = () => {
     setEmployeePage(1)
   }, [from, to])
 
+  const loadWhoByDayData = useCallback(async () => {
+    setWhoByDayLoading(true)
+    try {
+      const fromParam = whoByDayFrom.trim() || getDefaultRange().from
+      const toParam = whoByDayTo.trim() || getDefaultRange().to
+      const res = await fetch(`/api/analytics?from=${fromParam}&to=${toParam}`)
+      if (!res.ok) throw new Error("Failed to fetch")
+      const json = await res.json()
+      setWhoByDayData({ dailyBreakdown: json.dailyBreakdown ?? [] })
+    } catch {
+      setWhoByDayData(null)
+    } finally {
+      setWhoByDayLoading(false)
+    }
+  }, [whoByDayFrom, whoByDayTo])
+
+  useEffect(() => {
+    loadWhoByDayData()
+  }, [loadWhoByDayData])
+
   useEffect(() => {
     const totalPages = Math.ceil((data?.perUser?.length ?? 0) / EMPLOYEES_PER_PAGE)
     if (totalPages > 0 && employeePage > totalPages) {
       setEmployeePage(totalPages)
     }
   }, [data?.perUser?.length, employeePage])
+
+  const whoByDayBreakdown = whoByDayData?.dailyBreakdown ?? []
 
   const handlePreset = (days: number) => {
     const now = new Date()
@@ -526,6 +571,142 @@ export const AnalyticsPageContent = () => {
                   No daily data for this period
                 </p>
               </div>
+            )}
+          </Card>
+
+          <Card variant="default" padding="md">
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
+              <h2 className="flex items-center gap-2 text-lg font-semibold text-zinc-900 dark:text-zinc-100">
+                <CalendarCheck className="h-5 w-5" aria-hidden />
+                Who is in by day
+              </h2>
+              <div className="flex flex-row items-center gap-4">
+                <div className="flex flex-row items-center gap-2">
+                  <label
+                    htmlFor="who-by-day-start"
+                    className="text-sm font-medium text-zinc-700 dark:text-zinc-300 whitespace-nowrap"
+                  >
+                    Start date
+                  </label>
+                  <Input
+                    id="who-by-day-start"
+                    type="date"
+                    value={whoByDayFrom}
+                    onChange={(e) => setWhoByDayFrom(e.target.value)}
+                    className="w-40"
+                    aria-label="Start date for who is in by day"
+                    disabled={whoByDayLoading}
+                  />
+                </div>
+                <div className="flex flex-row items-center gap-2">
+                  <label
+                    htmlFor="who-by-day-end"
+                    className="text-sm font-medium text-zinc-700 dark:text-zinc-300 whitespace-nowrap"
+                  >
+                    End date
+                  </label>
+                  <Input
+                    id="who-by-day-end"
+                    type="date"
+                    value={whoByDayTo}
+                    onChange={(e) => setWhoByDayTo(e.target.value)}
+                    className="w-40"
+                    aria-label="End date for who is in by day"
+                    disabled={whoByDayLoading}
+                  />
+                </div>
+              </div>
+            </div>
+            <div
+              className="mb-5 flex gap-1.5 rounded-xl border border-zinc-200 bg-zinc-100/80 p-1.5 dark:border-zinc-700 dark:bg-zinc-800/80"
+              role="tablist"
+              aria-label="Filter by status"
+            >
+              <button
+                type="button"
+                role="tab"
+                aria-selected={whoByDayTab === "present"}
+                onClick={() => setWhoByDayTab("present")}
+                className={`min-h-[44px] flex-1 rounded-lg px-4 py-2.5 text-sm font-medium transition-all ${
+                  whoByDayTab === "present"
+                    ? "bg-white text-zinc-900 shadow-sm ring-1 ring-zinc-200/80 dark:bg-zinc-700 dark:text-zinc-100 dark:ring-zinc-600"
+                    : "text-zinc-600 hover:bg-white/50 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-700/50 dark:hover:text-zinc-100"
+                }`}
+              >
+                Present
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={whoByDayTab === "absent"}
+                onClick={() => setWhoByDayTab("absent")}
+                className={`min-h-[44px] flex-1 rounded-lg px-4 py-2.5 text-sm font-medium transition-all ${
+                  whoByDayTab === "absent"
+                    ? "bg-white text-zinc-900 shadow-sm ring-1 ring-zinc-200/80 dark:bg-zinc-700 dark:text-zinc-100 dark:ring-zinc-600"
+                    : "text-zinc-600 hover:bg-white/50 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-700/50 dark:hover:text-zinc-100"
+                }`}
+              >
+                Absent
+              </button>
+            </div>
+            {whoByDayLoading ? (
+              <div className="flex h-48 items-center justify-center rounded-xl bg-zinc-50 dark:bg-zinc-800/50">
+                <Loader2 className="h-8 w-8 animate-spin text-zinc-400" aria-hidden />
+                <span className="sr-only">Loading who is in by day</span>
+              </div>
+            ) : (
+            <div className="max-h-[520px] overflow-y-auto pr-1">
+              <div className="grid gap-4 pb-1 sm:grid-cols-2 lg:grid-cols-3">
+              {whoByDayBreakdown.length === 0 ? (
+                <p className="col-span-full py-8 text-center text-sm text-zinc-500 dark:text-zinc-400">
+                  No days in this range. Adjust the start or end date.
+                </p>
+              ) : (
+              whoByDayBreakdown.map((day) => {
+                  const presentAndLate = [...day.present, ...day.late]
+                  const list = whoByDayTab === "present" ? presentAndLate : day.absent
+                  return (
+                    <div
+                      key={day.date}
+                      className="overflow-hidden rounded-xl border border-zinc-200/80 bg-white shadow-sm dark:border-zinc-700/50 dark:bg-zinc-900/90"
+                    >
+                      <div className="border-b border-zinc-100 px-4 py-3 dark:border-zinc-800">
+                        <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+                          {formatDateWithWeekday(day.date)}
+                        </p>
+                        <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
+                          {list.length} {list.length === 1 ? "person" : "people"}
+                        </p>
+                      </div>
+                      <div className="p-3">
+                        {list.length === 0 ? (
+                          <p className="text-sm italic text-zinc-400 dark:text-zinc-500">
+                            {whoByDayTab === "present" ? "No one" : "No one absent"}
+                          </p>
+                        ) : (
+                          <ul className="space-y-1.5">
+                            {list.map((u, i) => (
+                              <li
+                                key={`${day.date}-${i}-${u.fullName}`}
+                                className="flex items-baseline justify-between gap-2 text-sm text-zinc-900 dark:text-zinc-100"
+                              >
+                                <span className="min-w-0 truncate font-medium">{u.fullName}</span>
+                                {u.userDisplayId ? (
+                                  <span className="shrink-0 text-xs tabular-nums text-zinc-500 dark:text-zinc-400">
+                                    {u.userDisplayId}
+                                  </span>
+                                ) : null}
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })
+                )}
+              </div>
+            </div>
             )}
           </Card>
 

@@ -1,29 +1,13 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
-
-function formatTime(v: string | null): string {
-  if (!v) return "00:00"
-  const s = String(v)
-  const parts = s.split(":")
-  const h = (parts[0] ?? "00").padStart(2, "0")
-  const m = (parts[1] ?? "00").padStart(2, "0")
-  return `${h}:${m}`
-}
-
-async function isAdmin(): Promise<boolean> {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user?.email) return false
-  const adminEmail = process.env.LOCAL_ADMIN_EMAIL?.trim()
-  return !!(adminEmail && user.email.toLowerCase() === adminEmail.toLowerCase())
-}
+import { requireAdmin } from "@/lib/auth"
+import { formatTime24 } from "@/lib/format-time"
 
 export async function GET(request: Request) {
   try {
-    const admin = await isAdmin()
-    if (!admin) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
+    const supabase = await createClient()
+    const unauthorized = await requireAdmin(supabase)
+    if (unauthorized) return unauthorized
 
     const { searchParams } = new URL(request.url)
     const status = searchParams.get("status")
@@ -31,7 +15,6 @@ export async function GET(request: Request) {
     const limit = Math.min(100, Math.max(1, parseInt(searchParams.get("limit") ?? "20", 10) || 20))
     const offset = (page - 1) * limit
 
-    const supabase = await createClient()
     let query = supabase
       .from("attendance_corrections")
       .select(
@@ -75,8 +58,8 @@ export async function GET(request: Request) {
           a.id,
           {
             date: a.attendance_date,
-            timeIn: a.time_in ? formatTime(a.time_in) : null,
-            timeOut: a.time_out ? formatTime(a.time_out) : null,
+            timeIn: a.time_in ? formatTime24(a.time_in) : null,
+            timeOut: a.time_out ? formatTime24(a.time_out) : null,
           },
         ])
       )
@@ -106,8 +89,8 @@ export async function GET(request: Request) {
         date: att?.date ?? "",
         currentTimeIn: att?.timeIn ?? null,
         currentTimeOut: att?.timeOut ?? null,
-        requestedTimeIn: r.requested_time_in ? formatTime(r.requested_time_in) : null,
-        requestedTimeOut: r.requested_time_out ? formatTime(r.requested_time_out) : null,
+        requestedTimeIn: r.requested_time_in ? formatTime24(r.requested_time_in) : null,
+        requestedTimeOut: r.requested_time_out ? formatTime24(r.requested_time_out) : null,
         reason: r.reason ?? null,
         status: r.status,
         createdAt: r.created_at,
@@ -173,7 +156,7 @@ export async function POST(request: Request) {
     let ti = requestedTimeIn?.trim() || null
     let to = requestedTimeOut?.trim() || null
 
-    const currentTimeIn = att.time_in ? formatTime(att.time_in) : null
+    const currentTimeIn = att.time_in ? formatTime24(att.time_in) : null
     const hasNoTimeOut = !att.time_out
 
     if (

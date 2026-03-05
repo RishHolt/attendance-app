@@ -23,13 +23,13 @@ export type AttendanceMetrics = {
 }
 
 /**
- * Late minutes: actual time-in minus scheduled time-in when late (> 15 min grace).
+ * Late minutes: actual time-in minus scheduled time-in when late (> 1 hour grace).
  * Returns 0 if on time or early.
  */
 export function calcLateMinutes(
   actualTimeIn: string,
   scheduledTimeIn: string,
-  graceMinutes = 15
+  graceMinutes = 60
 ): number {
   const actualM = parseTimeToMinutes(actualTimeIn)
   const schedM = parseTimeToMinutes(scheduledTimeIn)

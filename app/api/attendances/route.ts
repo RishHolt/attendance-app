@@ -1,39 +1,18 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { requireAdmin } from "@/lib/auth"
+import { formatTime24 } from "@/lib/format-time"
+import { getDefaultDateRange } from "@/lib/date-utils"
+import type { AdminAttendanceRow } from "@/types"
 
-function formatTime(v: string | null): string {
-  if (!v) return "00:00"
-  const s = String(v)
-  const parts = s.split(":")
-  const h = (parts[0] ?? "00").padStart(2, "0")
-  const m = (parts[1] ?? "00").padStart(2, "0")
-  return `${h}:${m}`
-}
-
-export type AdminAttendanceRow = {
-  id: string
-  userId: string
-  userDisplayId: string
-  fullName: string
-  date: string
-  status: "present" | "late" | "absent" | "incomplete"
-  approvalStatus: "pending" | "approved" | "denied"
-  timeIn: string | null
-  timeOut: string | null
-  remarks: string | null
-}
-
-function getDefaultDateRange(): { from: string; to: string } {
-  const now = new Date()
-  const to = now.toISOString().split("T")[0] ?? ""
-  const from = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
-    .toISOString()
-    .split("T")[0] ?? ""
-  return { from, to }
-}
+export type { AdminAttendanceRow }
 
 export async function GET(request: Request) {
   try {
+    const supabase = await createClient()
+    const unauthorized = await requireAdmin(supabase)
+    if (unauthorized) return unauthorized
+
     const { searchParams } = new URL(request.url)
     const approvalStatus = searchParams.get("approval_status")
     const statusFilter = searchParams.get("status")
@@ -48,8 +27,6 @@ export async function GET(request: Request) {
     const page = Math.max(1, parseInt(pageParam ?? "1", 10) || 1)
     const limit = Math.min(100, Math.max(1, parseInt(limitParam ?? "10", 10) || 10))
     const offset = (page - 1) * limit
-
-    const supabase = await createClient()
 
     let userIdsFilter: string[] | null = null
     if (search.length > 0) {
@@ -138,8 +115,8 @@ export async function GET(request: Request) {
         date: row.attendance_date,
         status: row.status as "present" | "late" | "absent" | "incomplete",
         approvalStatus: (row.approval_status ?? "pending") as "pending" | "approved" | "denied",
-        timeIn: row.time_in ? formatTime(row.time_in) : null,
-        timeOut: row.time_out ? formatTime(row.time_out) : null,
+        timeIn: row.time_in ? formatTime24(row.time_in) : null,
+        timeOut: row.time_out ? formatTime24(row.time_out) : null,
         remarks: (row as { remarks?: string | null }).remarks ?? null,
       }
     })

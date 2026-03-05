@@ -23,7 +23,7 @@ import { DenyAttendanceModal } from "./attendance/deny-attendance-modal"
 import { QrAttendanceModal } from "./attendance/qr-attendance-modal"
 import { formatTime12 } from "@/lib/format-time"
 import { swal } from "@/lib/swal"
-import type { AdminAttendanceRow } from "@/app/api/attendances/route"
+import type { AdminAttendanceRow } from "@/types"
 
 type Overview = {
   todayPresent: number
@@ -38,10 +38,18 @@ type Overview = {
   to: string
 }
 
+type DayBreakdown = {
+  date: string
+  present: { fullName: string; userDisplayId: string }[]
+  late: { fullName: string; userDisplayId: string }[]
+  absent: { fullName: string; userDisplayId: string }[]
+}
+
 type AnalyticsData = {
   overview: Overview
   approvalBreakdown: { pending: number; approved: number; denied: number }
   dailyTrend: { date: string; present: number; late: number; absent: number }[]
+  dailyBreakdown?: DayBreakdown[]
   perUser: {
     userId: string
     present: number
@@ -92,6 +100,7 @@ export const DashboardPageContent = () => {
   const [denyingId, setDenyingId] = useState<string | null>(null)
   const [denyModalRow, setDenyModalRow] = useState<AdminAttendanceRow | null>(null)
   const [qrModalOpen, setQrModalOpen] = useState(false)
+  const [whoByDayTab, setWhoByDayTab] = useState<"present" | "absent">("present")
 
   const loadData = useCallback(async () => {
     setIsLoading(true)
@@ -454,6 +463,91 @@ export const DashboardPageContent = () => {
                           <span className="w-12 shrink-0 text-right text-xs tabular-nums text-zinc-500 dark:text-zinc-400">
                             {total}
                           </span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {analyticsData.dailyBreakdown && analyticsData.dailyBreakdown.length > 0 && (
+                <div>
+                  <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-zinc-700 dark:text-zinc-300">
+                    <CalendarDays className="h-4 w-4" aria-hidden />
+                    Who is in by day (last 7 days)
+                  </h3>
+                  <div
+                    className="mb-4 flex gap-1 rounded-xl border border-zinc-200 bg-zinc-100/80 p-1.5 dark:border-zinc-700 dark:bg-zinc-800/80"
+                    role="tablist"
+                    aria-label="Filter by status"
+                  >
+                    <button
+                      type="button"
+                      role="tab"
+                      aria-selected={whoByDayTab === "present"}
+                      onClick={() => setWhoByDayTab("present")}
+                      className={`min-h-[44px] flex-1 rounded-lg px-4 py-2.5 text-sm font-medium transition-all ${
+                        whoByDayTab === "present"
+                          ? "bg-white text-zinc-900 shadow-sm ring-1 ring-zinc-200/80 dark:bg-zinc-700 dark:text-zinc-100 dark:ring-zinc-600"
+                          : "text-zinc-600 hover:bg-white/50 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-700/50 dark:hover:text-zinc-100"
+                      }`}
+                    >
+                      Present
+                    </button>
+                    <button
+                      type="button"
+                      role="tab"
+                      aria-selected={whoByDayTab === "absent"}
+                      onClick={() => setWhoByDayTab("absent")}
+                      className={`min-h-[44px] flex-1 rounded-lg px-4 py-2.5 text-sm font-medium transition-all ${
+                        whoByDayTab === "absent"
+                          ? "bg-white text-zinc-900 shadow-sm ring-1 ring-zinc-200/80 dark:bg-zinc-700 dark:text-zinc-100 dark:ring-zinc-600"
+                          : "text-zinc-600 hover:bg-white/50 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-700/50 dark:hover:text-zinc-100"
+                      }`}
+                    >
+                      Absent
+                    </button>
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {analyticsData.dailyBreakdown.slice(-7).map((day) => {
+                      const presentAndLate = [...day.present, ...day.late]
+                      const list = whoByDayTab === "present" ? presentAndLate : day.absent
+                      return (
+                        <div
+                          key={day.date}
+                          className="rounded-xl border border-zinc-200/80 bg-white shadow-sm dark:border-zinc-700/50 dark:bg-zinc-900/90"
+                        >
+                          <div className="border-b border-zinc-100 px-4 py-2.5 dark:border-zinc-800">
+                            <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+                              {formatDate(day.date)}
+                            </p>
+                            <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
+                              {list.length} {list.length === 1 ? "person" : "people"}
+                            </p>
+                          </div>
+                          <div className="p-3">
+                            {list.length === 0 ? (
+                              <p className="text-sm italic text-zinc-400 dark:text-zinc-500">
+                                {whoByDayTab === "present" ? "No one" : "No one absent"}
+                              </p>
+                            ) : (
+                              <ul className="space-y-1.5">
+                                {list.map((u, i) => (
+                                  <li
+                                    key={`${day.date}-${i}-${u.fullName}`}
+                                    className="flex items-baseline justify-between gap-2 text-sm text-zinc-900 dark:text-zinc-100"
+                                  >
+                                    <span className="min-w-0 truncate font-medium">{u.fullName}</span>
+                                    {u.userDisplayId ? (
+                                      <span className="shrink-0 text-xs tabular-nums text-zinc-500 dark:text-zinc-400">
+                                        {u.userDisplayId}
+                                      </span>
+                                    ) : null}
+                                  </li>
+                                ))}
+                              </ul>
+                            )}
+                          </div>
                         </div>
                       )
                     })}

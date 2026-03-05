@@ -5,7 +5,7 @@ import { Calendar, Search, Users } from "lucide-react"
 import { Button, Card, Input } from "@/components/ui"
 import { PageHeader } from "@/components/admin/page-header"
 import { ManageScheduleModal } from "./manage-schedule-modal"
-import type { ScheduleSummary } from "@/app/api/schedules/summaries/route"
+import type { ScheduleSummary } from "@/types"
 
 type UserRow = {
   id: string

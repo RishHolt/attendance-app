@@ -1,25 +1,20 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
-
-function getDefaultDateRange(): { from: string; to: string } {
-  const now = new Date()
-  const to = now.toISOString().split("T")[0] ?? ""
-  const from = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
-    .toISOString()
-    .split("T")[0] ?? ""
-  return { from, to }
-}
+import { requireAdmin } from "@/lib/auth"
+import { getDefaultDateRange } from "@/lib/date-utils"
 
 export async function GET(request: Request) {
   try {
+    const supabase = await createClient()
+    const unauthorized = await requireAdmin(supabase)
+    if (unauthorized) return unauthorized
+
     const { searchParams } = new URL(request.url)
     const fromParam = searchParams.get("from")
     const toParam = searchParams.get("to")
     const { from: defaultFrom, to: defaultTo } = getDefaultDateRange()
     const from = fromParam || defaultFrom
     const to = toParam || defaultTo
-
-    const supabase = await createClient()
 
     const { data: attendances, error: attError } = await supabase
       .from("attendances")
@@ -60,19 +55,6 @@ export async function GET(request: Request) {
       denied: rows.filter((r) => r.approval_status === "denied").length,
     }
 
-    const byDate = new Map<string, { present: number; late: number; absent: number }>()
-    for (const r of rows) {
-      const d = r.attendance_date
-      const curr = byDate.get(d) ?? { present: 0, late: 0, absent: 0 }
-      if (r.status === "present") curr.present++
-      else if (r.status === "late") curr.late++
-      else curr.absent++
-      byDate.set(d, curr)
-    }
-    const dailyTrend = Array.from(byDate.entries())
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([date, counts]) => ({ date, ...counts }))
-
     const userIds = [...new Set(rows.map((r) => r.user_id))]
     const { data: usersData } = await supabase
       .from("users")
@@ -81,6 +63,42 @@ export async function GET(request: Request) {
     const userMap = new Map(
       (usersData ?? []).map((u) => [u.id, { user_id: u.user_id, full_name: u.full_name }])
     )
+
+    const byDate = new Map<string, { present: number; late: number; absent: number }>()
+    const byDateUsers = new Map<
+      string,
+      {
+        present: { fullName: string; userDisplayId: string }[]
+        late: { fullName: string; userDisplayId: string }[]
+        absent: { fullName: string; userDisplayId: string }[]
+      }
+    >()
+    for (const r of rows) {
+      const d = r.attendance_date
+      const curr = byDate.get(d) ?? { present: 0, late: 0, absent: 0 }
+      if (r.status === "present") curr.present++
+      else if (r.status === "late") curr.late++
+      else curr.absent++
+      byDate.set(d, curr)
+
+      const u = userMap.get(r.user_id)
+      const userEntry = { fullName: u?.full_name ?? "Unknown", userDisplayId: u?.user_id ?? "" }
+      const dayUsers = byDateUsers.get(d) ?? {
+        present: [],
+        late: [],
+        absent: [],
+      }
+      if (r.status === "present") dayUsers.present.push(userEntry)
+      else if (r.status === "late") dayUsers.late.push(userEntry)
+      else dayUsers.absent.push(userEntry)
+      byDateUsers.set(d, dayUsers)
+    }
+    const dailyTrend = Array.from(byDate.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([date, counts]) => ({ date, ...counts }))
+    const dailyBreakdown = Array.from(byDateUsers.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([date, users]) => ({ date, ...users }))
 
     const byUser = new Map<
       string,
@@ -117,6 +135,7 @@ export async function GET(request: Request) {
       overview,
       approvalBreakdown,
       dailyTrend,
+      dailyBreakdown,
       perUser,
     })
   } catch (err) {

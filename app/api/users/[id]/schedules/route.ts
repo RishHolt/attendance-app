@@ -1,25 +1,9 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { formatTime24 } from "@/lib/format-time"
+import type { ScheduleRow } from "@/types"
 
-export type ScheduleRow = {
-  id: string
-  userId: string
-  dayOfWeek: number | null
-  customDate: string | null
-  timeIn: string
-  timeOut: string
-  breakTime: string | null
-  breakDuration: number | null
-}
-
-function formatTime(v: string | null): string {
-  if (!v) return "00:00"
-  const s = String(v)
-  const parts = s.split(":")
-  const h = (parts[0] ?? "00").padStart(2, "0")
-  const m = (parts[1] ?? "00").padStart(2, "0")
-  return `${h}:${m}`
-}
+export type { ScheduleRow }
 
 export async function GET(
   _request: Request,
@@ -62,9 +46,9 @@ export async function GET(
       userId: row.user_id,
       dayOfWeek: row.day_of_week ?? null,
       customDate: row.custom_date ?? null,
-      timeIn: formatTime(row.time_in),
-      timeOut: formatTime(row.time_out),
-      breakTime: row.break_time ? formatTime(row.break_time) : null,
+      timeIn: formatTime24(row.time_in),
+      timeOut: formatTime24(row.time_out),
+      breakTime: row.break_time ? formatTime24(row.break_time) : null,
       breakDuration: row.break_duration ?? null,
     }))
 
@@ -78,9 +62,9 @@ export async function GET(
 
     if (defaultsData) {
       defaultTemplate = {
-        timeIn: formatTime(defaultsData.time_in),
-        timeOut: formatTime(defaultsData.time_out),
-        breakTime: defaultsData.break_time ? formatTime(defaultsData.break_time) : null,
+        timeIn: formatTime24(defaultsData.time_in),
+        timeOut: formatTime24(defaultsData.time_out),
+        breakTime: defaultsData.break_time ? formatTime24(defaultsData.break_time) : null,
         breakDuration:
           typeof defaultsData.break_duration === "number" && defaultsData.break_duration >= 0
             ? defaultsData.break_duration

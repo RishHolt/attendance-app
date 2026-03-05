@@ -4,6 +4,8 @@ import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Clock, Loader2 } from "lucide-react"
 
+const COOLDOWN_MINUTES = 60
+
 const getTodayISO = () => {
   const d = new Date()
   return d.toISOString().split("T")[0] ?? ""
@@ -14,6 +16,13 @@ const getCurrentTime = () => {
   const h = d.getHours()
   const m = d.getMinutes()
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`
+}
+
+const timeToMinutesSinceMidnight = (timeStr: string): number => {
+  const parts = String(timeStr).trim().split(":")
+  const h = parseInt(parts[0] ?? "0", 10)
+  const m = parseInt(parts[1] ?? "0", 10)
+  return h * 60 + m
 }
 
 const hasScheduleForToday = (rows: { customDate: string | null; dayOfWeek: number | null }[]) => {
@@ -27,7 +36,7 @@ const hasScheduleForToday = (rows: { customDate: string | null; dayOfWeek: numbe
 
 export const QrClockInClient = () => {
   const router = useRouter()
-  const [status, setStatus] = useState<"loading" | "success" | "error">("loading")
+  const [status, setStatus] = useState<"loading" | "success" | "error" | "cooldown">("loading")
   const [message, setMessage] = useState("Clocking you in…")
 
   useEffect(() => {
@@ -73,8 +82,43 @@ export const QrClockInClient = () => {
           attendance = list.length > 0 ? list[0] : null
         }
 
-        if (attendance?.timeIn) {
-          setMessage("Already clocked in today")
+        if (attendance?.timeIn && attendance?.timeOut) {
+          setMessage("You're already clocked in and out for today")
+          setStatus("success")
+          setTimeout(() => router.replace("/user"), 1500)
+          return
+        }
+
+        if (attendance?.timeIn && !attendance?.timeOut) {
+          const timeInMinutes = timeToMinutesSinceMidnight(attendance.timeIn)
+          const nowMinutes = timeToMinutesSinceMidnight(now)
+          const elapsedMinutes =
+            nowMinutes >= timeInMinutes
+              ? nowMinutes - timeInMinutes
+              : 24 * 60 - timeInMinutes + nowMinutes
+          if (elapsedMinutes < COOLDOWN_MINUTES) {
+            const minutesLeft = COOLDOWN_MINUTES - elapsedMinutes
+            setMessage(
+              `You already scanned for time in. Come back in ${minutesLeft} minute${minutesLeft === 1 ? "" : "s"} to scan for time out.`
+            )
+            setStatus("cooldown")
+            return
+          }
+          const patchRes = await fetch(
+            `/api/users/${userId}/attendances/${attendance.id}`,
+            {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ timeOut: now }),
+            }
+          )
+          if (!patchRes.ok) {
+            const data = await patchRes.json()
+            setMessage(data.error ?? "Failed to time out")
+            setStatus("error")
+            return
+          }
+          setMessage("Clocked out successfully")
           setStatus("success")
           setTimeout(() => router.replace("/user"), 1500)
           return
@@ -168,6 +212,26 @@ export const QrClockInClient = () => {
             <p className="mt-2 text-center text-sm text-zinc-500 dark:text-zinc-400">
               Redirecting to dashboard…
             </p>
+          </>
+        )}
+        {status === "cooldown" && (
+          <>
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-900/40">
+              <Clock className="h-8 w-8 text-amber-600 dark:text-amber-400" />
+            </div>
+            <p className="mt-6 text-center font-medium text-zinc-900 dark:text-zinc-100">
+              {message}
+            </p>
+            <p className="mt-2 text-center text-sm text-zinc-500 dark:text-zinc-400">
+              You can scan again for time out after the cooldown.
+            </p>
+            <button
+              type="button"
+              onClick={() => router.push("/user")}
+              className="mt-6 w-full rounded-lg bg-zinc-900 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
+            >
+              Go to dashboard
+            </button>
           </>
         )}
         {status === "error" && (

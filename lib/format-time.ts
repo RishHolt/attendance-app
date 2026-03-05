@@ -1,4 +1,17 @@
 /**
+ * Normalizes a time value to 24-hour "HH:MM" format.
+ * Handles HH:MM, HH:MM:SS, and null/undefined.
+ */
+export function formatTime24(v: string | null | undefined): string {
+  if (v == null || v === "") return "00:00"
+  const s = String(v)
+  const parts = s.split(":")
+  const h = (parts[0] ?? "00").padStart(2, "0")
+  const m = (parts[1] ?? "00").padStart(2, "0")
+  return `${h}:${m}`
+}
+
+/**
  * Converts 24-hour time string to 12-hour format (e.g. "8:00 AM", "5:30 PM").
  * Handles HH:MM, HH:MM:SS, and ISO date strings.
  */

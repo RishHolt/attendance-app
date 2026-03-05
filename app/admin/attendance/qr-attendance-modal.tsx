@@ -83,7 +83,7 @@ export const QrAttendanceModal = ({ open, onClose }: QrAttendanceModalProps) => 
         color: rgb(0.1, 0.1, 0.15),
       })
 
-      page.drawText("Scan to time in", {
+      page.drawText("Scan to time in or time out", {
         x: margin,
         y: height - margin - 52,
         size: 14,
@@ -131,7 +131,7 @@ export const QrAttendanceModal = ({ open, onClose }: QrAttendanceModalProps) => 
         color: rgb(0.45, 0.45, 0.5),
       })
 
-      page.drawText("3. Sign in if prompted, then you will time in automatically", {
+      page.drawText("3. Sign in if prompted. First scan = time in; scan again after 1 hr = time out", {
         x: margin,
         y: qrY - 76,
         size: 9,
@@ -182,7 +182,7 @@ export const QrAttendanceModal = ({ open, onClose }: QrAttendanceModalProps) => 
       open={open}
       onClose={onClose}
       title="QR Attendance"
-      description="Users scan this QR code to time in."
+      description="Users scan this QR code to time in (first scan) or time out (after 1 hour cooldown)."
       footer={
         <div className="flex justify-end">
           <Button
@@ -202,7 +202,7 @@ export const QrAttendanceModal = ({ open, onClose }: QrAttendanceModalProps) => 
             <div className="bg-white dark:bg-zinc-800 p-4 border border-zinc-200 dark:border-zinc-700 rounded-xl">
               <img
                 src={qrDataUrl}
-                alt="QR code for time in"
+                alt="QR code for time in and time out"
                 width={256}
                 height={256}
                 className="rounded-lg"
@@ -225,8 +225,8 @@ export const QrAttendanceModal = ({ open, onClose }: QrAttendanceModalProps) => 
           </p>
         </div>
         <p className="text-zinc-500 dark:text-zinc-400 text-sm text-center">
-          Display this on a screen or print it. When users scan, they sign in (if
-          needed), time in automatically, then go to their dashboard.
+          Display this on a screen or print it. First scan records time in; after 1 hour
+          they can scan again to record time out. Sign in if prompted.
         </p>
       </div>
     </Modal>

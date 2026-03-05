@@ -518,25 +518,12 @@ export const AttendancePageContent = () => {
                     )}
                     {isDenied && (
                       <div className="mt-3 space-y-2">
-                        <p className="text-sm text-red-600 dark:text-red-400">
-                          You can request a correction below.
-                        </p>
                         {attendance?.remarks && (
                           <p className="text-sm text-red-600/90 dark:text-red-400/90">
                             Remarks: {attendance.remarks}
                           </p>
                         )}
                         <div className="flex flex-wrap items-center gap-2">
-                          <Button
-                            variant="secondary"
-                            size="sm"
-                            leftIcon={<Edit3 className="h-4 w-4" />}
-                            onClick={() => setCorrectionModalRow(attendance!)}
-                            aria-label="Request correction"
-                            disabled={attendance.correctionStatus === "pending"}
-                          >
-                            Request correction
-                          </Button>
                           {attendance.correctionStatus === "pending" && (
                             <span className="text-sm font-medium text-amber-600 dark:text-amber-400">
                               Pending
@@ -553,35 +540,6 @@ export const AttendancePageContent = () => {
                             </span>
                           )}
                         </div>
-                      </div>
-                    )}
-                    {hasTimeIn && !hasTimeOut && !isDenied && (
-                      <div className="mt-3 flex flex-wrap items-center gap-2">
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          leftIcon={<Edit3 className="h-4 w-4" />}
-                          onClick={() => setCorrectionModalRow(attendance!)}
-                          aria-label="Request correction for forgotten time out"
-                          disabled={attendance.correctionStatus === "pending"}
-                        >
-                          Request correction
-                        </Button>
-                        {attendance.correctionStatus === "pending" && (
-                          <span className="text-sm font-medium text-amber-600 dark:text-amber-400">
-                            Pending
-                          </span>
-                        )}
-                        {attendance.correctionStatus === "approved" && (
-                          <span className="inline-flex rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400">
-                            Approved
-                          </span>
-                        )}
-                        {attendance.correctionStatus === "rejected" && (
-                          <span className="text-sm font-medium text-red-600 dark:text-red-400">
-                            Denied
-                          </span>
-                        )}
                       </div>
                     )}
                   </div>

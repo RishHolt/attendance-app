@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server"
 import { formatTime12 } from "@/lib/format-time"
 import { createClient } from "@/lib/supabase/server"
+import { requireAdmin } from "@/lib/auth"
+import type { ScheduleSummary } from "@/types"
+
+export type { ScheduleSummary }
 
 const DAY_LABELS: Record<number, string> = {
   0: "Sun",
@@ -34,15 +38,11 @@ function formatDaysRange(days: number[]): string {
     .join(", ")
 }
 
-export type ScheduleSummary = {
-  userId: string
-  hasSchedule: boolean
-  summary: string
-}
-
 export async function GET() {
   try {
     const supabase = await createClient()
+    const unauthorized = await requireAdmin(supabase)
+    if (unauthorized) return unauthorized
 
     const { data: usersData } = await supabase
       .from("users")

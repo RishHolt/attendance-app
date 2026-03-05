@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { requireAdmin } from "@/lib/auth"
 
 export async function DELETE(
   _request: Request,
@@ -12,6 +13,8 @@ export async function DELETE(
     }
 
     const supabase = await createClient()
+    const unauthorized = await requireAdmin(supabase)
+    if (unauthorized) return unauthorized
     const { error } = await supabase.from("schedules").delete().eq("id", id)
 
     if (error) {

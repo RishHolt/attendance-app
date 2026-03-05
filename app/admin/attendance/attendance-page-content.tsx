@@ -10,7 +10,7 @@ import { PageHeader } from "@/components/admin/page-header"
 import { formatTime12 } from "@/lib/format-time"
 import { swal } from "@/lib/swal"
 import { useDebounce } from "@/lib/use-debounce"
-import type { AdminAttendanceRow } from "@/app/api/attendances/route"
+import type { AdminAttendanceRow } from "@/types"
 
 type TabValue = "pending" | "approved" | "denied" | "incomplete" | "corrections"
 

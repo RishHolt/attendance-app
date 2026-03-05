@@ -1,14 +1,8 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { requireAdmin } from "@/lib/auth"
+import { formatTime24 } from "@/lib/format-time"
 import { deriveStatusFromTimes } from "@/lib/attendance-status"
-
-async function isAdmin(): Promise<boolean> {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user?.email) return false
-  const adminEmail = process.env.LOCAL_ADMIN_EMAIL?.trim()
-  return !!(adminEmail && user.email.toLowerCase() === adminEmail.toLowerCase())
-}
 
 async function getScheduledTimeInForDate(
   supabase: Awaited<ReturnType<typeof createClient>>,
@@ -35,15 +29,6 @@ async function getScheduledTimeInForDate(
   return `${h}:${m}`
 }
 
-function formatTime(v: string | null): string {
-  if (!v) return "00:00"
-  const s = String(v)
-  const parts = s.split(":")
-  const h = (parts[0] ?? "00").padStart(2, "0")
-  const m = (parts[1] ?? "00").padStart(2, "0")
-  return `${h}:${m}`
-}
-
 function toPostgresTime(hhmm: string): string {
   if (!hhmm) return "00:00:00"
   const parts = String(hhmm).split(":")
@@ -58,15 +43,14 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const admin = await isAdmin()
-    if (!admin) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
-
     const { id } = await params
     if (!id) {
       return NextResponse.json({ error: "Correction ID required" }, { status: 400 })
     }
+
+    const supabase = await createClient()
+    const unauthorized = await requireAdmin(supabase)
+    if (unauthorized) return unauthorized
 
     const body = await request.json()
     const { status } = body as { status?: "approved" | "rejected" }
@@ -77,8 +61,6 @@ export async function PATCH(
         { status: 400 }
       )
     }
-
-    const supabase = await createClient()
     const { data: correction } = await supabase
       .from("attendance_corrections")
       .select("id, attendance_id, user_id, requested_time_in, requested_time_out, status")
@@ -124,11 +106,11 @@ export async function PATCH(
       let reqTimeInRaw = c.requested_time_in ?? c.requestedTimeIn ?? null
       let reqTimeOutRaw = c.requested_time_out ?? c.requestedTimeOut ?? null
 
-      const currentTimeIn = att.time_in ? formatTime(att.time_in) : null
+      const currentTimeIn = att.time_in ? formatTime24(att.time_in) : null
       const hasNoTimeOut = !att.time_out
 
       const toMinutes = (t: string) => {
-        const s = formatTime(t)
+        const s = formatTime24(t)
         const [h, m] = s.split(":").map(Number)
         return (h ?? 0) * 60 + (m ?? 0)
       }
@@ -139,12 +121,12 @@ export async function PATCH(
         reqTimeOutRaw != null &&
         String(reqTimeOutRaw).trim() !== ""
       ) {
-        const outFormatted = formatTime(reqTimeOutRaw)
+        const outFormatted = formatTime24(reqTimeOutRaw)
         if (toMinutes(outFormatted) < toMinutes(currentTimeIn)) {
           const reqInSameAsCurrent =
             reqTimeInRaw != null &&
             String(reqTimeInRaw).trim() !== "" &&
-            formatTime(reqTimeInRaw) === currentTimeIn
+            formatTime24(reqTimeInRaw) === currentTimeIn
           if (!reqTimeInRaw || reqInSameAsCurrent) {
             reqTimeInRaw = reqTimeOutRaw
             reqTimeOutRaw = null
@@ -153,14 +135,14 @@ export async function PATCH(
       }
 
       const newTimeIn = reqTimeInRaw
-        ? formatTime(reqTimeInRaw)
+        ? formatTime24(reqTimeInRaw)
         : att.time_in
-          ? formatTime(att.time_in)
+          ? formatTime24(att.time_in)
           : null
       const newTimeOut = reqTimeOutRaw
-        ? formatTime(reqTimeOutRaw)
+        ? formatTime24(reqTimeOutRaw)
         : att.time_out
-          ? formatTime(att.time_out)
+          ? formatTime24(att.time_out)
           : null
       const scheduledTimeIn = await getScheduledTimeInForDate(
         supabase,
@@ -177,10 +159,10 @@ export async function PATCH(
         status: derivedStatus,
       }
       if (reqTimeInRaw != null && String(reqTimeInRaw).trim() !== "") {
-        attUpdates.time_in = toPostgresTime(formatTime(reqTimeInRaw))
+        attUpdates.time_in = toPostgresTime(formatTime24(reqTimeInRaw))
       }
       if (reqTimeOutRaw != null && String(reqTimeOutRaw).trim() !== "") {
-        attUpdates.time_out = toPostgresTime(formatTime(reqTimeOutRaw))
+        attUpdates.time_out = toPostgresTime(formatTime24(reqTimeOutRaw))
       }
       if (newTimeIn && newTimeOut) {
         attUpdates.approval_status = "approved"
