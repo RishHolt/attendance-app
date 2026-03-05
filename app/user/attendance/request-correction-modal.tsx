@@ -125,7 +125,7 @@ export const RequestCorrectionModal = ({
             disabled={
               isSubmitting ||
               !reason.trim() ||
-              (row && !row.timeOut && !requestedTimeIn.trim())
+              !!(row && !row.timeOut && !requestedTimeIn.trim())
             }
           >
             Submit request
