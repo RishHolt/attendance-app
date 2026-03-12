@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
-import { CalendarCheck, CheckCircle2, Clock, Edit3, AlertCircle, LogOut, QrCode, Search, XCircle } from "lucide-react"
+import { CalendarCheck, CheckCircle2, Clock, Edit3, AlertCircle, LogOut, QrCode, Search, XCircle, CheckSquare, Square } from "lucide-react"
 import { Button, Card, Input, Pagination } from "@/components/ui"
 import { AddTimeOutModal } from "./add-time-out-modal"
 import { DenyAttendanceModal } from "./deny-attendance-modal"
@@ -80,6 +80,9 @@ export const AttendancePageContent = () => {
   const [total, setTotal] = useState(0)
   const [search, setSearch] = useState("")
   const debouncedSearch = useDebounce(search, 400)
+  const [selectedAttendances, setSelectedAttendances] = useState<Set<string>>(new Set())
+  const [selectedCorrections, setSelectedCorrections] = useState<Set<string>>(new Set())
+  const [isBulkApproving, setIsBulkApproving] = useState(false)
 
   const loadData = useCallback(async () => {
     setIsLoading(true)
@@ -106,6 +109,128 @@ export const AttendancePageContent = () => {
   useEffect(() => {
     loadData()
   }, [loadData])
+
+  useEffect(() => {
+    // Clear selections when tab changes
+    setSelectedAttendances(new Set())
+    setSelectedCorrections(new Set())
+  }, [tab])
+
+  const handleBulkApproveAttendances = async () => {
+    if (selectedAttendances.size === 0) return
+    
+    setIsBulkApproving(true)
+    try {
+      const approvePromises = Array.from(selectedAttendances).map(async (id) => {
+        const row = attendances.find(r => r.id === id)
+        if (!row) return
+        
+        const res = await fetch(
+          `/api/users/${row.userId}/attendances/${row.id}`,
+          {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ approvalStatus: "approved" }),
+          }
+        )
+        return res.ok
+      })
+      
+      const results = await Promise.all(approvePromises)
+      const failedCount = results.filter(r => !r).length
+      
+      if (failedCount === 0) {
+        await swal.success(`${selectedAttendances.size} attendance record(s) approved`)
+      } else {
+        await swal.error(`${failedCount} out of ${selectedAttendances.size} records failed to approve`)
+      }
+      
+      setSelectedAttendances(new Set())
+      loadData()
+    } catch {
+      swal.error("Failed to bulk approve attendances")
+    } finally {
+      setIsBulkApproving(false)
+    }
+  }
+
+  const handleBulkApproveCorrections = async () => {
+    if (selectedCorrections.size === 0) return
+    
+    setIsBulkApproving(true)
+    try {
+      const approvePromises = Array.from(selectedCorrections).map(async (id) => {
+        const res = await fetch(`/api/attendance-corrections/${id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status: "approved" }),
+        })
+        return res.ok
+      })
+      
+      const results = await Promise.all(approvePromises)
+      const failedCount = results.filter(r => !r).length
+      
+      if (failedCount === 0) {
+        await swal.success(`${selectedCorrections.size} correction request(s) approved`)
+      } else {
+        await swal.error(`${failedCount} out of ${selectedCorrections.size} requests failed to approve`)
+      }
+      
+      setSelectedCorrections(new Set())
+      loadData()
+    } catch {
+      swal.error("Failed to bulk approve corrections")
+    } finally {
+      setIsBulkApproving(false)
+    }
+  }
+
+  const toggleAttendanceSelection = (id: string) => {
+    setSelectedAttendances(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(id)) {
+        newSet.delete(id)
+      } else {
+        newSet.add(id)
+      }
+      return newSet
+    })
+  }
+
+  const toggleCorrectionSelection = (id: string) => {
+    setSelectedCorrections(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(id)) {
+        newSet.delete(id)
+      } else {
+        newSet.add(id)
+      }
+      return newSet
+    })
+  }
+
+  const toggleAllAttendances = () => {
+    if (selectedAttendances.size === attendances.length) {
+      setSelectedAttendances(new Set())
+    } else {
+      setSelectedAttendances(new Set(attendances.map(r => r.id)))
+    }
+  }
+
+  const toggleAllCorrections = () => {
+    if (selectedCorrections.size === corrections.length) {
+      setSelectedCorrections(new Set())
+    } else {
+      setSelectedCorrections(new Set(corrections.map(r => r.id)))
+    }
+  }
+
+  const shouldShowBulkActions = tab === "pending" || tab === "corrections"
+  const isPendingTab = tab === "pending"
+  const selectedCount = isPendingTab ? selectedAttendances.size : selectedCorrections.size
+  const totalCount = isPendingTab ? attendances.length : corrections.length
+  const allSelected = selectedCount === totalCount && totalCount > 0
 
   const handleApprove = async (row: AdminAttendanceRow) => {
     setApprovingId(row.id)
@@ -367,10 +492,55 @@ export const AttendancePageContent = () => {
               </div>
             ) : (
               <>
+                {shouldShowBulkActions && (
+                  <div className="mb-4 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={() => isPendingTab ? toggleAllAttendances() : toggleAllCorrections()}
+                        className="flex items-center gap-2 text-sm text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
+                      >
+                        {allSelected ? (
+                          <><CheckSquare className="h-4 w-4" /> Deselect All</>
+                        ) : (
+                          <><Square className="h-4 w-4" /> Select All</>
+                        )}
+                      </button>
+                      <span className="text-sm text-zinc-500 dark:text-zinc-400">
+                        {selectedCount} of {totalCount} selected
+                      </span>
+                    </div>
+                    <Button
+                      onClick={() => isPendingTab ? handleBulkApproveAttendances() : handleBulkApproveCorrections()}
+                      disabled={isBulkApproving || selectedCount === 0}
+                      isLoading={isBulkApproving}
+                      leftIcon={<CheckCircle2 className="h-4 w-4" />}
+                      size="sm"
+                    >
+                      Approve Selected ({selectedCount})
+                    </Button>
+                  </div>
+                )}
                 <div className="hidden overflow-x-auto md:block">
                   <table className="w-full min-w-[600px]">
                     <thead>
                       <tr className="border-b border-zinc-200 dark:border-zinc-800">
+                        {shouldShowBulkActions && (
+                          <th className="pb-3 pr-4 text-left text-xs font-medium uppercase tracking-wider text-zinc-500 dark:text-zinc-400 w-12">
+                            <button
+                              type="button"
+                              onClick={() => isPendingTab ? toggleAllAttendances() : toggleAllCorrections()}
+                              className="flex items-center justify-center"
+                              aria-label={allSelected ? "Deselect all" : "Select all"}
+                            >
+                              {allSelected ? (
+                                <CheckSquare className="h-4 w-4" />
+                              ) : (
+                                <Square className="h-4 w-4" />
+                              )}
+                            </button>
+                          </th>
+                        )}
                         <th className="pb-3 pr-4 text-left text-xs font-medium uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
                           Date
                         </th>
@@ -397,6 +567,22 @@ export const AttendancePageContent = () => {
                           key={row.id}
                           className="border-b border-zinc-100 dark:border-zinc-800/50 last:border-b-0"
                         >
+                          {shouldShowBulkActions && (
+                            <td className="py-4 pr-4">
+                              <button
+                                type="button"
+                                onClick={() => toggleCorrectionSelection(row.id)}
+                                className="flex items-center justify-center"
+                                aria-label={selectedCorrections.has(row.id) ? "Deselect correction" : "Select correction"}
+                              >
+                                {selectedCorrections.has(row.id) ? (
+                                  <CheckSquare className="h-4 w-4 text-zinc-600 dark:text-zinc-400" />
+                                ) : (
+                                  <Square className="h-4 w-4 text-zinc-400 dark:text-zinc-600" />
+                                )}
+                              </button>
+                            </td>
+                          )}
                           <td className="py-4 pr-4 text-sm text-zinc-900 dark:text-zinc-100">
                             {formatDate(row.date)}
                           </td>
@@ -456,25 +642,43 @@ export const AttendancePageContent = () => {
                       key={row.id}
                       className="rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900/50"
                     >
-                      <p className="font-medium text-zinc-900 dark:text-zinc-100">
-                        {row.fullName}
-                      </p>
-                      <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-                        {formatDate(row.date)}
-                      </p>
-                      <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-                        Current: {row.currentTimeIn ? formatTime12(row.currentTimeIn) : "—"} –{" "}
-                        {row.currentTimeOut ? formatTime12(row.currentTimeOut) : "—"}
-                      </p>
-                      <p className="text-sm text-zinc-600 dark:text-zinc-400">
-                        Requested: {row.requestedTimeIn ? formatTime12(row.requestedTimeIn) : "—"} –{" "}
-                        {row.requestedTimeOut ? formatTime12(row.requestedTimeOut) : "—"}
-                      </p>
-                      {row.reason && (
-                        <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
-                          {row.reason}
-                        </p>
-                      )}
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex-1">
+                          <p className="font-medium text-zinc-900 dark:text-zinc-100">
+                            {row.fullName}
+                          </p>
+                          <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+                            {formatDate(row.date)}
+                          </p>
+                          <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
+                            Current: {row.currentTimeIn ? formatTime12(row.currentTimeIn) : "—"} –{" "}
+                            {row.currentTimeOut ? formatTime12(row.currentTimeOut) : "—"}
+                          </p>
+                          <p className="text-sm text-zinc-600 dark:text-zinc-400">
+                            Requested: {row.requestedTimeIn ? formatTime12(row.requestedTimeIn) : "—"} –{" "}
+                            {row.requestedTimeOut ? formatTime12(row.requestedTimeOut) : "—"}
+                          </p>
+                          {row.reason && (
+                            <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
+                              {row.reason}
+                            </p>
+                          )}
+                        </div>
+                        {shouldShowBulkActions && (
+                          <button
+                            type="button"
+                            onClick={() => toggleCorrectionSelection(row.id)}
+                            className="flex items-center justify-center p-2"
+                            aria-label={selectedCorrections.has(row.id) ? "Deselect correction" : "Select correction"}
+                          >
+                            {selectedCorrections.has(row.id) ? (
+                              <CheckSquare className="h-4 w-4 text-zinc-600 dark:text-zinc-400" />
+                            ) : (
+                              <Square className="h-4 w-4 text-zinc-400 dark:text-zinc-600" />
+                            )}
+                          </button>
+                        )}
+                      </div>
                       <div className="mt-4 flex gap-2">
                         <Button
                           size="sm"
@@ -540,6 +744,22 @@ export const AttendancePageContent = () => {
                 <table className="w-full min-w-[600px]">
                   <thead>
                     <tr className="border-b border-zinc-200 dark:border-zinc-800">
+                      {shouldShowBulkActions && (
+                        <th className="pb-3 pr-4 text-left text-xs font-medium uppercase tracking-wider text-zinc-500 dark:text-zinc-400 w-12">
+                          <button
+                            type="button"
+                            onClick={() => isPendingTab ? toggleAllAttendances() : toggleAllCorrections()}
+                            className="flex items-center justify-center"
+                            aria-label={allSelected ? "Deselect all" : "Select all"}
+                          >
+                            {allSelected ? (
+                              <CheckSquare className="h-4 w-4" />
+                            ) : (
+                              <Square className="h-4 w-4" />
+                            )}
+                          </button>
+                        </th>
+                      )}
                       <th className="pb-3 pr-4 text-left text-xs font-medium uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
                         Date
                       </th>
@@ -571,8 +791,24 @@ export const AttendancePageContent = () => {
                     {attendances.map((row) => (
                       <tr
                         key={row.id}
-                        className="border-b border-zinc-100 dark:border-zinc-800/50 last:border-0"
+                        className="border-b border-zinc-100 dark:border-zinc-800/50 last:border-b-0"
                       >
+                        {shouldShowBulkActions && (
+                          <td className="py-4 pr-4">
+                            <button
+                              type="button"
+                              onClick={() => toggleAttendanceSelection(row.id)}
+                              className="flex items-center justify-center"
+                              aria-label={selectedAttendances.has(row.id) ? "Deselect attendance" : "Select attendance"}
+                            >
+                              {selectedAttendances.has(row.id) ? (
+                                <CheckSquare className="h-4 w-4 text-zinc-600 dark:text-zinc-400" />
+                              ) : (
+                                <Square className="h-4 w-4 text-zinc-400 dark:text-zinc-600" />
+                              )}
+                            </button>
+                          </td>
+                        )}
                         <td className="py-4 pr-4 text-sm text-zinc-900 dark:text-zinc-100">
                           {formatDate(row.date)}
                         </td>
@@ -677,7 +913,7 @@ export const AttendancePageContent = () => {
                     className="rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900/50"
                   >
                     <div className="flex items-start justify-between gap-3">
-                      <div>
+                      <div className="flex-1">
                         <p className="font-medium text-zinc-900 dark:text-zinc-100">
                           {row.fullName}
                         </p>
@@ -714,55 +950,71 @@ export const AttendancePageContent = () => {
                           )}
                         </div>
                       </div>
-                      {(tab === "pending" || tab === "incomplete") && (
-                        <div className="flex flex-wrap items-center gap-2">
-                          {tab === "pending" && row.timeOut ? (
-                            <>
-                              <Button
-                                size="sm"
-                                leftIcon={<CheckCircle2 className="h-4 w-4" />}
-                                onClick={() => handleApprove(row)}
-                                disabled={approvingId === row.id || denyingId === row.id}
-                                isLoading={approvingId === row.id}
-                              >
-                                Approve
-                              </Button>
-                              <Button
-                                variant="secondary"
-                                size="sm"
-                                leftIcon={<XCircle className="h-4 w-4" />}
-                                onClick={() => handleDenyClick(row)}
-                                disabled={approvingId === row.id || denyingId === row.id}
-                                isLoading={denyingId === row.id}
-                              >
-                                Deny
-                              </Button>
-                            </>
-                          ) : tab === "incomplete" ? (
-                            <>
-                              <Button
-                                size="sm"
-                                leftIcon={<LogOut className="h-4 w-4" />}
-                                onClick={() => setAddTimeOutRow(row)}
-                                disabled={addingTimeOutId === row.id || denyingId === row.id}
-                                isLoading={addingTimeOutId === row.id}
-                              >
-                                Add time out
-                              </Button>
-                              <Button
-                                variant="secondary"
-                                size="sm"
-                                leftIcon={<XCircle className="h-4 w-4" />}
-                                onClick={() => handleDenyClick(row)}
-                                disabled={addingTimeOutId === row.id || denyingId === row.id}
-                                isLoading={denyingId === row.id}
-                              >
-                                Deny
-                              </Button>
-                            </>
-                          ) : null}
-                        </div>
-                      )}
+                      <div className="flex items-start gap-2">
+                        {shouldShowBulkActions && (
+                          <button
+                            type="button"
+                            onClick={() => toggleAttendanceSelection(row.id)}
+                            className="flex items-center justify-center p-2"
+                            aria-label={selectedAttendances.has(row.id) ? "Deselect attendance" : "Select attendance"}
+                          >
+                            {selectedAttendances.has(row.id) ? (
+                              <CheckSquare className="h-4 w-4 text-zinc-600 dark:text-zinc-400" />
+                            ) : (
+                              <Square className="h-4 w-4 text-zinc-400 dark:text-zinc-600" />
+                            )}
+                          </button>
+                        )}
+                        {(tab === "pending" || tab === "incomplete") && (
+                          <div className="flex flex-wrap items-center gap-2">
+                            {tab === "pending" && row.timeOut ? (
+                              <>
+                                <Button
+                                  size="sm"
+                                  leftIcon={<CheckCircle2 className="h-4 w-4" />}
+                                  onClick={() => handleApprove(row)}
+                                  disabled={approvingId === row.id || denyingId === row.id}
+                                  isLoading={approvingId === row.id}
+                                >
+                                  Approve
+                                </Button>
+                                <Button
+                                  variant="secondary"
+                                  size="sm"
+                                  leftIcon={<XCircle className="h-4 w-4" />}
+                                  onClick={() => handleDenyClick(row)}
+                                  disabled={approvingId === row.id || denyingId === row.id}
+                                  isLoading={denyingId === row.id}
+                                >
+                                  Deny
+                                </Button>
+                              </>
+                            ) : tab === "incomplete" ? (
+                              <>
+                                <Button
+                                  size="sm"
+                                  leftIcon={<LogOut className="h-4 w-4" />}
+                                  onClick={() => setAddTimeOutRow(row)}
+                                  disabled={addingTimeOutId === row.id || denyingId === row.id}
+                                  isLoading={addingTimeOutId === row.id}
+                                >
+                                  Add time out
+                                </Button>
+                                <Button
+                                  variant="secondary"
+                                  size="sm"
+                                  leftIcon={<XCircle className="h-4 w-4" />}
+                                  onClick={() => handleDenyClick(row)}
+                                  disabled={addingTimeOutId === row.id || denyingId === row.id}
+                                  isLoading={denyingId === row.id}
+                                >
+                                  Deny
+                                </Button>
+                              </>
+                            ) : null}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
                 ))}

@@ -11,19 +11,12 @@ import { UserPageLayout } from "@/components/user/user-page-layout"
 import { PageSection } from "@/components/user/page-section"
 import { ExportPdfModal } from "@/app/admin/calendar/export-pdf-modal"
 import { RequestCorrectionModal } from "@/app/user/attendance/request-correction-modal"
+import type { ScheduleRow } from "@/types/schedule"
+import { convertApiScheduleToScheduleRow } from "@/lib/schedule-utils"
 type MeUser = {
   id: string
   fullName: string
   startDate: string | null
-}
-
-type ScheduleRow = {
-  dayOfWeek: number | null
-  customDate: string | null
-  timeIn: string
-  timeOut: string
-  breakTime: string | null
-  breakDuration: number | null
 }
 
 type AttendanceRow = {
@@ -64,21 +57,7 @@ const fetchUserSchedules = async (userId: string): Promise<ScheduleRow[]> => {
       (r: { dayOfWeek: number | null; customDate: string | null }) =>
         r.dayOfWeek != null || r.customDate != null
     )
-    .map((r: {
-      dayOfWeek: number | null
-      customDate: string | null
-      timeIn: string
-      timeOut: string
-      breakTime: string | null
-      breakDuration: number | null
-    }) => ({
-      dayOfWeek: r.dayOfWeek ?? null,
-      customDate: r.customDate ?? null,
-      timeIn: r.timeIn,
-      timeOut: r.timeOut,
-      breakTime: r.breakTime ?? null,
-      breakDuration: r.breakDuration ?? null,
-    }))
+    .map(convertApiScheduleToScheduleRow)
 }
 
 const fetchAttendances = async (
@@ -789,6 +768,8 @@ export const UserCalendarPageContent = () => {
         onExport={handleExportPdf}
         currentMonthLabel={monthLabel}
         disabled={isExporting}
+        schedules={schedules}
+        userStartDate={me?.startDate}
       />
 
       <RequestCorrectionModal

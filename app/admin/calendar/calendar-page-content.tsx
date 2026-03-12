@@ -10,6 +10,8 @@ import { deriveAttendanceStatus, type AttendanceStatus } from "@/lib/attendance-
 import { generateCalendarPdf, type AttendanceExportRow, type ExportSummary } from "@/lib/calendar-pdf"
 import { AttendanceModal, type AttendanceRow } from "./attendance-modal"
 import { ExportPdfModal } from "./export-pdf-modal"
+import type { ScheduleRow } from "@/types/schedule"
+import { convertApiScheduleToScheduleRow } from "@/lib/schedule-utils"
 
 type UserRow = {
   id: string
@@ -19,15 +21,6 @@ type UserRow = {
   contactNo: string | null
   position: string | null
   startDate: string | null
-}
-
-type ScheduleRow = {
-  dayOfWeek: number | null
-  customDate: string | null
-  timeIn: string
-  timeOut: string
-  breakTime: string | null
-  breakDuration: number | null
 }
 
 type CalendarCell = {
@@ -76,21 +69,7 @@ const fetchUserSchedules = async (userId: string): Promise<ScheduleRow[]> => {
       (r: { dayOfWeek: number | null; customDate: string | null }) =>
         r.dayOfWeek != null || r.customDate != null
     )
-    .map((r: {
-      dayOfWeek: number | null
-      customDate: string | null
-      timeIn: string
-      timeOut: string
-      breakTime: string | null
-      breakDuration: number | null
-    }) => ({
-      dayOfWeek: r.dayOfWeek ?? null,
-      customDate: r.customDate ?? null,
-      timeIn: r.timeIn,
-      timeOut: r.timeOut,
-      breakTime: r.breakTime ?? null,
-      breakDuration: r.breakDuration ?? null,
-    }))
+    .map(convertApiScheduleToScheduleRow)
 }
 
 const PAGE_SIZE = 500
@@ -545,12 +524,10 @@ export const CalendarPageContent = () => {
           const schedule =
             scheduleByDate.get(dateStr) ?? scheduleByDay.get(dayOfWeek)
           const existingAttendance = exportAttendanceByDate.get(dateStr)
-          const isApproved = existingAttendance?.approvalStatus === "approved"
           if (
             schedule &&
             existingAttendance?.timeIn &&
-            existingAttendance?.timeOut &&
-            isApproved
+            existingAttendance?.timeOut
           ) {
             const actualM = calcWorkMinutes(
               existingAttendance.timeIn,
@@ -1061,6 +1038,8 @@ export const CalendarPageContent = () => {
         onExport={handleExportPdf}
         currentMonthLabel={monthLabel}
         disabled={isExporting}
+        schedules={schedules}
+        userStartDate={users.find(u => u.id === selectedUserId)?.startDate}
       />
     </div>
   )

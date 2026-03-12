@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from "react"
 import { Modal, Button, Input, Label } from "@/components/ui"
+import { getDefaultReportRange } from "@/lib/schedule-utils"
+import type { ScheduleRow } from "@/types/schedule"
 
 const SUPERVISOR_STORAGE_KEY = "attendance-export-supervisor"
 
@@ -17,6 +19,8 @@ type ExportPdfModalProps = {
   }) => Promise<void>
   currentMonthLabel: string
   disabled?: boolean
+  schedules?: ScheduleRow[]
+  userStartDate?: string | null
 }
 
 export const ExportPdfModal = ({
@@ -25,6 +29,8 @@ export const ExportPdfModal = ({
   onExport,
   currentMonthLabel,
   disabled,
+  schedules,
+  userStartDate,
 }: ExportPdfModalProps) => {
   const [mode, setMode] = useState<"month" | "custom">("month")
   const [dateStart, setDateStart] = useState("")
@@ -61,13 +67,12 @@ export const ExportPdfModal = ({
 
   useEffect(() => {
     if (open && mode === "custom") {
-      const today = new Date()
-      const first = new Date(today.getFullYear(), today.getMonth(), 1)
-      const last = new Date(today.getFullYear(), today.getMonth() + 1, 0)
-      setDateStart(first.toISOString().slice(0, 10))
-      setDateEnd(last.toISOString().slice(0, 10))
+      // Use smart defaults based on schedule and user start date
+      const defaultRange = getDefaultReportRange(schedules || [], userStartDate)
+      setDateStart(defaultRange.from)
+      setDateEnd(defaultRange.to)
     }
-  }, [open, mode])
+  }, [open, mode, schedules, userStartDate])
 
   const handleExport = async () => {
     if (mode === "custom" && (!dateStart || !dateEnd)) return

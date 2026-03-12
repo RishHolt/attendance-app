@@ -15,6 +15,7 @@ import {
 import { DateTime } from "@/components/ui"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { UserAccountDropdown } from "./user-account-dropdown"
+import { PageTransitionWrapper } from "@/components/page-transition-wrapper"
 
 const headerNav = [
   { href: "/user", label: "Dashboard", icon: LayoutDashboard },
@@ -182,7 +183,11 @@ export const UserShell = ({ children, userName }: UserShellProps) => {
         </header>
 
         <main className="flex-1 p-3 sm:p-6 overflow-auto">
-          <div className="mx-auto max-w-7xl w-full">{children}</div>
+          <div className="mx-auto max-w-7xl w-full">
+            <PageTransitionWrapper>
+              {children}
+            </PageTransitionWrapper>
+          </div>
         </main>
       </div>
     </div>

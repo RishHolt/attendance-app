@@ -19,6 +19,7 @@ import { DateTime } from "@/components/ui"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { AccountDropdown } from "./account-dropdown"
 import { Breadcrumbs } from "./breadcrumbs"
+import { PageTransitionWrapper } from "@/components/page-transition-wrapper"
 
 const sidebarNav = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
@@ -142,7 +143,11 @@ export const AdminShell = ({ children, userName }: AdminShellProps) => {
         </header>
 
         <main className="flex-1 p-4 sm:p-6 overflow-auto min-w-0">
-          <div className="mx-auto max-w-7xl min-w-0 w-full">{children}</div>
+          <div className="mx-auto max-w-7xl min-w-0 w-full">
+            <PageTransitionWrapper>
+              {children}
+            </PageTransitionWrapper>
+          </div>
         </main>
       </div>
     </div>
