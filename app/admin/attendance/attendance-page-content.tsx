@@ -84,6 +84,9 @@ export const AttendancePageContent = () => {
   const [selectedCorrections, setSelectedCorrections] = useState<Set<string>>(new Set())
   const [isBulkApproving, setIsBulkApproving] = useState(false)
 
+  const getAttendanceSelectionKey = (row: Pick<AdminAttendanceRow, "id" | "userId">) =>
+    `${row.userId}:${row.id}`
+
   const loadData = useCallback(async () => {
     setIsLoading(true)
     if (tab === "corrections") {
@@ -121,12 +124,12 @@ export const AttendancePageContent = () => {
     
     setIsBulkApproving(true)
     try {
-      const approvePromises = Array.from(selectedAttendances).map(async (id) => {
-        const row = attendances.find(r => r.id === id)
-        if (!row) return
-        
+      const approvePromises = Array.from(selectedAttendances).map(async (key) => {
+        const [userId, attendanceId] = key.split(":")
+        if (!userId || !attendanceId) return false
+
         const res = await fetch(
-          `/api/users/${row.userId}/attendances/${row.id}`,
+          `/api/users/${userId}/attendances/${attendanceId}`,
           {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
@@ -211,10 +214,13 @@ export const AttendancePageContent = () => {
   }
 
   const toggleAllAttendances = () => {
-    if (selectedAttendances.size === attendances.length) {
+    const selectableAttendances =
+      tab === "pending" ? attendances.filter((r) => !!r.timeOut) : attendances
+
+    if (selectedAttendances.size === selectableAttendances.length) {
       setSelectedAttendances(new Set())
     } else {
-      setSelectedAttendances(new Set(attendances.map(r => r.id)))
+      setSelectedAttendances(new Set(selectableAttendances.map((r) => getAttendanceSelectionKey(r))))
     }
   }
 
@@ -229,7 +235,7 @@ export const AttendancePageContent = () => {
   const shouldShowBulkActions = tab === "pending" || tab === "corrections"
   const isPendingTab = tab === "pending"
   const selectedCount = isPendingTab ? selectedAttendances.size : selectedCorrections.size
-  const totalCount = isPendingTab ? attendances.length : corrections.length
+  const totalCount = isPendingTab ? attendances.filter((r) => !!r.timeOut).length : corrections.length
   const allSelected = selectedCount === totalCount && totalCount > 0
 
   const handleApprove = async (row: AdminAttendanceRow) => {
@@ -740,6 +746,39 @@ export const AttendancePageContent = () => {
             </div>
           ) : (
             <>
+              {shouldShowBulkActions && tab === "pending" && (
+                <div className="mb-4 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => toggleAllAttendances()}
+                      className="flex items-center gap-2 text-sm text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
+                    >
+                      {allSelected ? (
+                        <>
+                          <CheckSquare className="h-4 w-4" /> Deselect All
+                        </>
+                      ) : (
+                        <>
+                          <Square className="h-4 w-4" /> Select All
+                        </>
+                      )}
+                    </button>
+                    <span className="text-sm text-zinc-500 dark:text-zinc-400">
+                      {selectedCount} of {totalCount} selected
+                    </span>
+                  </div>
+                  <Button
+                    onClick={() => handleBulkApproveAttendances()}
+                    disabled={isBulkApproving || selectedCount === 0}
+                    isLoading={isBulkApproving}
+                    leftIcon={<CheckCircle2 className="h-4 w-4" />}
+                    size="sm"
+                  >
+                    Approve Selected ({selectedCount})
+                  </Button>
+                </div>
+              )}
               <div className="hidden overflow-x-auto md:block">
                 <table className="w-full min-w-[600px]">
                   <thead>
@@ -797,11 +836,18 @@ export const AttendancePageContent = () => {
                           <td className="py-4 pr-4">
                             <button
                               type="button"
-                              onClick={() => toggleAttendanceSelection(row.id)}
-                              className="flex items-center justify-center"
-                              aria-label={selectedAttendances.has(row.id) ? "Deselect attendance" : "Select attendance"}
+                              onClick={() => toggleAttendanceSelection(getAttendanceSelectionKey(row))}
+                              disabled={tab === "pending" && !row.timeOut}
+                              className="flex items-center justify-center disabled:cursor-not-allowed disabled:opacity-40"
+                              aria-label={
+                                tab === "pending" && !row.timeOut
+                                  ? "Attendance cannot be selected until it has a time out"
+                                  : selectedAttendances.has(getAttendanceSelectionKey(row))
+                                    ? "Deselect attendance"
+                                    : "Select attendance"
+                              }
                             >
-                              {selectedAttendances.has(row.id) ? (
+                              {selectedAttendances.has(getAttendanceSelectionKey(row)) ? (
                                 <CheckSquare className="h-4 w-4 text-zinc-600 dark:text-zinc-400" />
                               ) : (
                                 <Square className="h-4 w-4 text-zinc-400 dark:text-zinc-600" />
@@ -954,11 +1000,18 @@ export const AttendancePageContent = () => {
                         {shouldShowBulkActions && (
                           <button
                             type="button"
-                            onClick={() => toggleAttendanceSelection(row.id)}
-                            className="flex items-center justify-center p-2"
-                            aria-label={selectedAttendances.has(row.id) ? "Deselect attendance" : "Select attendance"}
+                            onClick={() => toggleAttendanceSelection(getAttendanceSelectionKey(row))}
+                            disabled={tab === "pending" && !row.timeOut}
+                            className="flex items-center justify-center p-2 disabled:cursor-not-allowed disabled:opacity-40"
+                            aria-label={
+                              tab === "pending" && !row.timeOut
+                                ? "Attendance cannot be selected until it has a time out"
+                                : selectedAttendances.has(getAttendanceSelectionKey(row))
+                                  ? "Deselect attendance"
+                                  : "Select attendance"
+                            }
                           >
-                            {selectedAttendances.has(row.id) ? (
+                            {selectedAttendances.has(getAttendanceSelectionKey(row)) ? (
                               <CheckSquare className="h-4 w-4 text-zinc-600 dark:text-zinc-400" />
                             ) : (
                               <Square className="h-4 w-4 text-zinc-400 dark:text-zinc-600" />

@@ -70,9 +70,8 @@ export const QrClockInClient = () => {
         const today = getTodayISO()
         const now = getCurrentTime()
 
-        const [attRes, schedRes] = await Promise.all([
+        const [attRes] = await Promise.all([
           fetch(`/api/users/${userId}/attendances?from=${today}&to=${today}`),
-          fetch(`/api/users/${userId}/schedules`),
         ])
 
         let attendance: { id: string; timeIn: string | null; timeOut: string | null } | null = null
@@ -121,21 +120,6 @@ export const QrClockInClient = () => {
           setMessage("Clocked out successfully")
           setStatus("success")
           setTimeout(() => router.replace("/user"), 1500)
-          return
-        }
-
-        let todaySchedule: boolean
-        if (schedRes.ok) {
-          const schedData = await schedRes.json()
-          const rows = schedData.rows ?? []
-          todaySchedule = hasScheduleForToday(rows)
-        } else {
-          todaySchedule = false
-        }
-
-        if (!todaySchedule) {
-          setMessage("You have no schedule today. Please contact your admin to set up your schedule.")
-          setStatus("error")
           return
         }
 

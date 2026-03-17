@@ -91,33 +91,6 @@ export async function PATCH(
       return NextResponse.json({ error: "No updates provided" }, { status: 400 })
     }
 
-    const isUserClockInOrOut =
-      (updates.time_in !== undefined && updates.time_in != null) ||
-      (updates.time_out !== undefined && updates.time_out != null)
-    if (isUserClockInOrOut && updates.approval_status === undefined) {
-      const { data: att } = await supabase
-        .from("attendances")
-        .select("user_id, attendance_date")
-        .eq("id", attendanceId)
-        .single()
-      if (att?.user_id && att?.attendance_date) {
-        const hasSchedule = await hasScheduleForDate(
-          supabase,
-          att.user_id,
-          att.attendance_date
-        )
-        if (!hasSchedule) {
-          return NextResponse.json(
-            {
-              error:
-                "You have no schedule for this date. Please contact your admin to set up your schedule.",
-            },
-            { status: 400 }
-          )
-        }
-      }
-    }
-
     if (updates.approval_status === "approved") {
       const { data: existing } = await supabase
         .from("attendances")

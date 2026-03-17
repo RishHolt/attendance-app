@@ -38,6 +38,10 @@ export const RequestCorrectionModal = ({
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  const todayISO = new Date().toISOString().split("T")[0] ?? ""
+  const isPastDate = !!row?.date && !!todayISO && row.date < todayISO
+  const canRequestTimeOut = !!row?.timeOut || isPastDate
+
   useEffect(() => {
     if (open && row) {
       setRequestedTimeIn(toTimeInputValue(row.timeIn))
@@ -52,12 +56,11 @@ export const RequestCorrectionModal = ({
     const ti = requestedTimeIn.trim()
     const to = requestedTimeOut.trim()
     const reasonTrimmed = reason.trim()
-    const hasTimeOut = !!row.timeOut
-    if (hasTimeOut && !ti && !to) {
+    if (canRequestTimeOut && !ti && !to) {
       setError("Please provide at least time in or time out")
       return
     }
-    if (!hasTimeOut && !ti) {
+    if (!canRequestTimeOut && !ti) {
       setError("Please provide the correct time in")
       return
     }
@@ -74,7 +77,7 @@ export const RequestCorrectionModal = ({
         body: JSON.stringify({
           attendanceId: row.id,
           requestedTimeIn: ti || undefined,
-          requestedTimeOut: hasTimeOut ? (to || undefined) : undefined,
+          requestedTimeOut: canRequestTimeOut ? (to || undefined) : undefined,
           reason: reasonTrimmed,
         }),
       })
@@ -125,7 +128,8 @@ export const RequestCorrectionModal = ({
             disabled={
               isSubmitting ||
               !reason.trim() ||
-              !!(row && !row.timeOut && !requestedTimeIn.trim())
+              !!(row && !canRequestTimeOut && !requestedTimeIn.trim()) ||
+              !!(row && canRequestTimeOut && !requestedTimeIn.trim() && !requestedTimeOut.trim())
             }
           >
             Submit request
@@ -141,15 +145,15 @@ export const RequestCorrectionModal = ({
             value={requestedTimeIn}
             onChange={(e) => setRequestedTimeIn(e.target.value)}
             disabled={isSubmitting}
-            aria-describedby={row?.timeOut ? undefined : "time-in-hint"}
+            aria-describedby={canRequestTimeOut ? undefined : "time-in-hint"}
           />
-          {row && !row.timeOut && (
+          {row && !canRequestTimeOut && (
             <p id="time-in-hint" className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
               Change this to the actual time you timed in (e.g. 8:00 AM if you forgot to time in earlier)
             </p>
           )}
         </div>
-        {row?.timeOut != null && row.timeOut !== "" && (
+        {canRequestTimeOut && (
           <div>
             <Input
               type="time"

@@ -266,14 +266,6 @@ export async function POST(
     }
 
     const supabase = await createClient()
-    const hasSchedule = await hasScheduleForDate(supabase, userId, date.trim())
-    if (!hasSchedule) {
-      return NextResponse.json(
-        { error: "No schedule for this date. Attendance can only be recorded for scheduled days." },
-        { status: 400 }
-      )
-    }
-
     const ti = timeIn?.trim() || null
     const to = timeOut?.trim() || null
     let derivedStatus: "present" | "late" | "absent" | "incomplete"

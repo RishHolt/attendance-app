@@ -61,16 +61,18 @@ export async function GET(request: Request) {
       .order("created_at", { ascending: false })
 
     if (approvalStatus === "pending" || approvalStatus === "approved" || approvalStatus === "denied") {
-      query = query.eq("approval_status", approvalStatus)
       if (approvalStatus === "pending") {
-        query = query.not("time_out", "is", null)
+        // Treat NULL approval_status as "pending" for backwards compatibility
+        query = query.or("approval_status.eq.pending,approval_status.is.null").not("time_out", "is", null)
+      } else {
+        query = query.eq("approval_status", approvalStatus)
       }
     }
     if (statusFilter === "incomplete") {
       query = query
-        .not("time_in", "is", null)
-        .is("time_out", null)
-        .eq("approval_status", "pending")
+        .eq("status", "incomplete")
+        // Treat NULL approval_status as "pending" so older rows and new clock-ins both show
+        .or("approval_status.eq.pending,approval_status.is.null")
     }
     if (userIdsFilter && userIdsFilter.length > 0) {
       query = query.in("user_id", userIdsFilter)

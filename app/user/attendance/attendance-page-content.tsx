@@ -128,7 +128,10 @@ const formatTotalHours = (
 
 const getTodayISO = () => {
   const d = new Date()
-  return d.toISOString().split("T")[0] ?? ""
+  const year = d.getFullYear()
+  const month = String(d.getMonth() + 1).padStart(2, "0")
+  const day = String(d.getDate()).padStart(2, "0")
+  return `${year}-${month}-${day}`
 }
 
 const getCurrentTime = () => {
@@ -325,10 +328,6 @@ export const AttendancePageContent = () => {
 
   const handleClockIn = async () => {
     if (!me) return
-    if (!todaySchedule) {
-      swal.error("You have no schedule today. Please contact your admin to set up your schedule.")
-      return
-    }
     setIsClockInLoading(true)
     try {
       const today = getTodayISO()
