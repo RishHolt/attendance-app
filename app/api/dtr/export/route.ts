@@ -180,7 +180,9 @@ export async function POST(req: NextRequest) {
       const breakDurH = (schedule.break_duration as number | null) ?? 0
       let amDeparture = ''
       let pmArrival = ''
-      if (breakTimeRaw?.trim()) {
+      // Only split AM/PM around break when there is a full attendance day. Otherwise break times
+      // (e.g. 12:00 / 1:00) look like real departure/arrival on future days or days not yet worked.
+      if (breakTimeRaw?.trim() && timeIn && timeOut) {
         amDeparture = formatTime12NoAmPm(breakTimeRaw)
         const breakStartM = parseTimeToMinutes(breakTimeRaw)
         const breakEndM = breakStartM + Math.round(breakDurH * 60)
