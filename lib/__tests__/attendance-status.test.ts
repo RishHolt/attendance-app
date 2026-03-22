@@ -105,6 +105,22 @@ describe("deriveAttendanceStatus", () => {
     ).toBe("upcoming")
   })
 
+  it("returns upcoming for tomorrow even if attendance rows exist (future days ignore clock times)", () => {
+    expect(
+      deriveAttendanceStatus({
+        hasSchedule: true,
+        hasTimeIn: true,
+        hasTimeOut: true,
+        scheduledTimeIn,
+        actualTimeIn: "08:00",
+        dateStr: tomorrowStr,
+        todayStr,
+        tomorrowStr,
+        startDateStr: "2025-01-01",
+      })
+    ).toBe("upcoming")
+  })
+
   it("returns absent for past date on or after start date with no time-in", () => {
     expect(
       deriveAttendanceStatus({

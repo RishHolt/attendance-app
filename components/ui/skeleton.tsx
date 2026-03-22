@@ -156,25 +156,81 @@ export const AttendancePageSkeleton = () => {
   )
 }
 
-export const CalendarSkeleton = () => {
+/** Toolbar + stats strip for the admin calendar card (matches calendar-page layout). */
+export const CalendarToolbarSkeleton = () => {
   return (
-    <div className="space-y-6">
-      <PageHeaderSkeleton />
-      <div className="rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900/50">
-        <div className="grid grid-cols-7 gap-1 mb-2">
+    <>
+      <div className="mb-6 flex flex-col gap-3 rounded-xl border border-zinc-200/80 bg-zinc-50/50 px-4 py-3 dark:border-zinc-700/80 dark:bg-zinc-800/30 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:gap-4">
+          <Skeleton className="h-4 w-44 max-w-full" variant="text" />
+          <Skeleton className="h-7 w-24" />
+        </div>
+        <Skeleton className="h-10 w-36 rounded-xl min-h-[44px] shrink-0" />
+      </div>
+      <div className="flex flex-col gap-4 lg:flex-row lg:justify-between lg:items-center lg:gap-6">
+        <div className="flex flex-1 flex-col gap-3 lg:flex-row lg:items-center lg:gap-6 w-full min-w-0">
+          <div className="flex flex-row items-center gap-3 w-full min-w-0 flex-1">
+            <Skeleton className="h-4 w-24 shrink-0 hidden sm:block" variant="text" />
+            <Skeleton className="h-11 w-full min-h-[44px] rounded-xl" />
+          </div>
+        </div>
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:gap-4 min-w-0 w-full lg:w-auto">
+          <div className="flex items-center gap-1 bg-zinc-50/50 dark:bg-zinc-800/50 p-1 border border-zinc-200 dark:border-zinc-700 rounded-xl w-full lg:w-auto justify-center min-w-0">
+            <Skeleton className="h-10 w-10 rounded-lg shrink-0 min-w-[44px] min-h-[44px]" />
+            <Skeleton className="h-5 flex-1 lg:min-w-[160px] lg:max-w-[200px] mx-2" variant="text" />
+            <Skeleton className="h-10 w-10 rounded-lg shrink-0 min-w-[44px] min-h-[44px]" />
+          </div>
+          <Skeleton className="h-10 w-full lg:w-[120px] rounded-xl min-h-[44px]" />
+        </div>
+      </div>
+    </>
+  )
+}
+
+/** Full calendar grid placeholder (6×7 cells, matches visible month grid). */
+export const CalendarGridSkeleton = () => {
+  return (
+    <div
+      className="bg-zinc-50/30 dark:bg-zinc-900/30 shadow-sm mt-6 md:mt-8 border border-zinc-200 dark:border-zinc-700 rounded-2xl overflow-x-auto -mx-1 px-1 md:mx-0 md:px-0"
+    >
+      <div className="min-w-[600px]">
+        <div className="grid grid-cols-7 bg-white dark:bg-zinc-800/50 border-zinc-200 dark:border-zinc-700 border-b">
           {Array.from({ length: 7 }).map((_, i) => (
-            <div key={i} className="text-center">
+            <div
+              key={i}
+              className="px-2 py-3 text-center"
+            >
               <Skeleton className="h-4 w-8 mx-auto" variant="text" />
             </div>
           ))}
         </div>
-        <div className="grid grid-cols-7 gap-1">
-          {Array.from({ length: 35 }).map((_, i) => (
-            <div key={i} className="aspect-square">
-              <Skeleton className="h-full w-full rounded" />
+        <div className="grid grid-cols-7">
+          {Array.from({ length: 42 }).map((_, i) => (
+            <div
+              key={i}
+              className="min-h-[110px] border-b border-r border-zinc-200/80 p-3 dark:border-zinc-700/80 bg-white dark:bg-zinc-900"
+            >
+              <Skeleton className="h-8 w-8 rounded-lg" />
+              <div className="mt-2 space-y-1.5">
+                <Skeleton className="h-3 w-full" variant="text" />
+                <Skeleton className="h-3 w-4/5" variant="text" />
+                <Skeleton className="h-5 w-14 rounded-md" />
+              </div>
             </div>
           ))}
         </div>
+      </div>
+    </div>
+  )
+}
+
+export const CalendarSkeleton = () => {
+  return (
+    <div className="space-y-6">
+      <PageHeaderSkeleton />
+      <div className="rounded-xl border border-zinc-200 bg-white p-4 md:p-6 dark:border-zinc-800 dark:bg-zinc-900/50">
+        <CalendarToolbarSkeleton />
+        <CalendarGridSkeleton />
       </div>
     </div>
   )

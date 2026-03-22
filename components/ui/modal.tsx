@@ -23,6 +23,8 @@ type ModalProps = {
   description?: string
   children: ReactNode
   footer?: ReactNode
+  /** Tailwind max-width on panel (default: max-w-2xl) */
+  maxWidthClassName?: string
 }
 
 const TRANSITION = { duration: 0.2, ease: "easeOut" as const }
@@ -34,6 +36,7 @@ export const Modal = ({
   description,
   children,
   footer,
+  maxWidthClassName,
 }: ModalProps) => {
   const panelRef = useRef<HTMLDivElement>(null)
   const [mounted, setMounted] = useState(false)
@@ -115,7 +118,7 @@ export const Modal = ({
       <motion.div
         ref={panelRef}
         tabIndex={-1}
-        className="relative z-10 flex w-full max-w-2xl max-h-[90dvh] flex-col overflow-hidden rounded-2xl border border-zinc-200/80 bg-white shadow-xl dark:border-zinc-700/80 dark:bg-zinc-900 dark:shadow-zinc-950/50"
+        className={`relative z-10 flex w-full max-h-[90dvh] flex-col overflow-hidden rounded-2xl border border-zinc-200/80 bg-white shadow-xl dark:border-zinc-700/80 dark:bg-zinc-900 dark:shadow-zinc-950/50 ${maxWidthClassName ?? "max-w-2xl"}`}
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{
           opacity: isExiting ? 0 : 1,

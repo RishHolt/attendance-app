@@ -39,7 +39,9 @@ export function deriveAttendanceStatus(input: DeriveStatusInput): AttendanceStat
 
   if (!hasSchedule) return "no-schedule"
 
-  if (hasTimeIn && actualTimeIn) {
+  const isFutureDay = dateStr > todayStr
+
+  if (hasTimeIn && actualTimeIn && !isFutureDay) {
     if (!hasTimeOut) return "incomplete"
     return isLate(actualTimeIn, scheduledTimeIn) ? "late" : "present"
   }

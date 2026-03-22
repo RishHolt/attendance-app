@@ -1,15 +1,16 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
-import { ChevronLeft, ChevronRight, Download } from "lucide-react"
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from "react"
+import { ChevronDown, ChevronLeft, ChevronRight, Eye, SlidersHorizontal } from "lucide-react"
 import { Button } from "@/components/ui"
+import { CalendarGridSkeleton, Skeleton } from "@/components/ui/skeleton"
 import { formatTime12 } from "@/lib/format-time"
 import { calcWorkMinutes, formatMinutesAsHours, formatTotalWithOvertime } from "@/lib/time-calc"
 import { deriveAttendanceStatus, type AttendanceStatus } from "@/lib/attendance-status"
-import { generateCalendarPdf, type AttendanceExportRow, type ExportSummary } from "@/lib/calendar-pdf"
 import { UserPageLayout } from "@/components/user/user-page-layout"
 import { PageSection } from "@/components/user/page-section"
-import { ExportPdfModal } from "@/app/admin/calendar/export-pdf-modal"
+import { ViewDtrModal } from "@/app/admin/calendar/view-dtr-modal"
+import { buildDtrExportFileBaseName } from "@/lib/dtr/export-filename"
 import { RequestCorrectionModal } from "@/app/user/attendance/request-correction-modal"
 import type { ScheduleRow } from "@/types/schedule"
 import { convertApiScheduleToScheduleRow } from "@/lib/schedule-utils"
@@ -60,22 +61,70 @@ const fetchUserSchedules = async (userId: string): Promise<ScheduleRow[]> => {
     .map(convertApiScheduleToScheduleRow)
 }
 
+const PAGE_SIZE = 500
+
 const fetchAttendances = async (
   userId: string,
   from: string,
   to: string
 ): Promise<AttendanceRow[]> => {
-  const res = await fetch(
-    `/api/users/${userId}/attendances?from=${from}&to=${to}&page=1&limit=500`
-  )
-  if (!res.ok) return []
-  const data = await res.json()
-  const rows = data?.rows ?? []
-  return rows
+  const allRows: AttendanceRow[] = []
+  let page = 1
+  let total = Infinity
+
+  while (allRows.length < total) {
+    const res = await fetch(
+      `/api/users/${userId}/attendances?from=${from}&to=${to}&page=${page}&limit=${PAGE_SIZE}`
+    )
+    if (!res.ok) return allRows.length ? allRows : []
+    const data = await res.json()
+    const rows = data?.rows ?? []
+    if (rows.length === 0) break
+    allRows.push(...rows)
+    total = typeof data?.total === "number" ? data.total : allRows.length
+    if (rows.length < PAGE_SIZE || allRows.length >= total) break
+    page++
+  }
+
+  return allRows
 }
 
 const toDateStr = (d: Date) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
+
+const parseIsoDateLocal = (s: string): Date => {
+  const [y, m, d] = s.split("-").map(Number)
+  return new Date(y, m - 1, d)
+}
+
+const getCalendarVisibleRange = (currentDate: Date): { from: string; to: string } => {
+  const year = currentDate.getFullYear()
+  const month = currentDate.getMonth()
+  const firstOfMonth = new Date(year, month, 1)
+  const lastOfMonth = new Date(year, month + 1, 0)
+  const startPad = firstOfMonth.getDay()
+  const daysInMonth = lastOfMonth.getDate()
+  const remaining = 42 - startPad - daysInMonth
+  const firstVisible = new Date(year, month, 1 - startPad)
+  const lastVisible = new Date(year, month + 1, remaining)
+  const pad = (n: number) => String(n).padStart(2, "0")
+  return {
+    from: `${firstVisible.getFullYear()}-${pad(firstVisible.getMonth() + 1)}-${pad(firstVisible.getDate())}`,
+    to: `${lastVisible.getFullYear()}-${pad(lastVisible.getMonth() + 1)}-${pad(lastVisible.getDate())}`,
+  }
+}
+
+const mergeAttendanceFetchRanges = (
+  calendar: { from: string; to: string },
+  hoursFrom: string,
+  hoursTo: string
+): { from: string; to: string } => {
+  if (!hoursFrom || !hoursTo || hoursFrom > hoursTo) return calendar
+  return {
+    from: calendar.from < hoursFrom ? calendar.from : hoursFrom,
+    to: calendar.to > hoursTo ? calendar.to : hoursTo,
+  }
+}
 
 export const UserCalendarPageContent = () => {
   const [me, setMe] = useState<MeUser | null>(null)
@@ -84,10 +133,47 @@ export const UserCalendarPageContent = () => {
   const [currentDate, setCurrentDate] = useState(() => new Date())
   const [isLoading, setIsLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
-  const [exportPdfModalOpen, setExportPdfModalOpen] = useState(false)
-  const [isExporting, setIsExporting] = useState(false)
+  const [viewDtrModalOpen, setViewDtrModalOpen] = useState(false)
   const [correctionModalRow, setCorrectionModalRow] = useState<AttendanceRow | null>(null)
   const [refreshTrigger, setRefreshTrigger] = useState(0)
+  const [hoursRangeFrom, setHoursRangeFrom] = useState("")
+  const [hoursRangeTo, setHoursRangeTo] = useState("")
+  const [hoursFilterOpen, setHoursFilterOpen] = useState(false)
+  const hoursFilterWrapRef = useRef<HTMLDivElement>(null)
+
+  const applyDefaultHoursRange = useCallback(() => {
+    const y = currentDate.getFullYear()
+    const m = currentDate.getMonth()
+    const first = new Date(y, m, 1)
+    const last = new Date(y, m + 1, 0)
+    const now = new Date()
+    setHoursRangeFrom(toDateStr(first))
+    const isViewingCurrentMonth =
+      now.getFullYear() === y && now.getMonth() === m
+    setHoursRangeTo(isViewingCurrentMonth ? toDateStr(now) : toDateStr(last))
+  }, [currentDate])
+
+  useEffect(() => {
+    applyDefaultHoursRange()
+  }, [applyDefaultHoursRange])
+
+  useEffect(() => {
+    if (!hoursFilterOpen) return
+    const handlePointerDown = (e: MouseEvent) => {
+      if (!hoursFilterWrapRef.current?.contains(e.target as Node)) {
+        setHoursFilterOpen(false)
+      }
+    }
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setHoursFilterOpen(false)
+    }
+    document.addEventListener("mousedown", handlePointerDown)
+    document.addEventListener("keydown", handleKeyDown)
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown)
+      document.removeEventListener("keydown", handleKeyDown)
+    }
+  }, [hoursFilterOpen])
 
   useEffect(() => {
     const loadMe = async () => {
@@ -104,23 +190,17 @@ export const UserCalendarPageContent = () => {
     loadMe()
   }, [])
 
+  const mergedAttendanceFetchRange = useMemo(() => {
+    const cal = getCalendarVisibleRange(currentDate)
+    return mergeAttendanceFetchRanges(cal, hoursRangeFrom, hoursRangeTo)
+  }, [currentDate, hoursRangeFrom, hoursRangeTo])
+
   useEffect(() => {
     if (!me?.id) return
     let cancelled = false
     const load = async () => {
       setIsLoading(true)
-      const year = currentDate.getFullYear()
-      const month = currentDate.getMonth()
-      const first = new Date(year, month, 1)
-      const last = new Date(year, month + 1, 0)
-      const startPad = first.getDay()
-      const daysInMonth = last.getDate()
-      const remaining = 42 - startPad - daysInMonth
-      const firstVisible = new Date(year, month, 1 - startPad)
-      const lastVisible = new Date(year, month + 1, remaining)
-      const from = toDateStr(firstVisible)
-      const to = toDateStr(lastVisible)
-
+      const { from, to } = mergedAttendanceFetchRange
       const [schedData, attData] = await Promise.all([
         fetchUserSchedules(me.id),
         fetchAttendances(me.id, from, to),
@@ -135,7 +215,7 @@ export const UserCalendarPageContent = () => {
     return () => {
       cancelled = true
     }
-  }, [me?.id, currentDate, refreshTrigger])
+  }, [me?.id, mergedAttendanceFetchRange, refreshTrigger])
 
   const scheduleByDay = useMemo(() => {
     const map = new Map<number, ScheduleRow>()
@@ -159,7 +239,9 @@ export const UserCalendarPageContent = () => {
   const attendanceByDate = useMemo(() => {
     const map = new Map<string, AttendanceRow>()
     for (const a of attendances) {
-      map.set(a.date, a)
+      const key =
+        typeof a.date === "string" ? a.date.slice(0, 10) : String(a.date).slice(0, 10)
+      map.set(key, a)
     }
     return map
   }, [attendances])
@@ -225,222 +307,36 @@ export const UserCalendarPageContent = () => {
     setRefreshTrigger((t) => t + 1)
   }, [])
 
-  const handleExportPdf = useCallback(
-    async (opts: {
-      mode: "month" | "custom"
-      dateStart?: string
-      dateEnd?: string
-      supervisorName: string
-      supervisorPosition: string
-    }) => {
-      if (!me) return
-      setIsExporting(true)
-      try {
-        const year = currentDate.getFullYear()
-        const month = currentDate.getMonth()
-        let daysToExport: Date[]
-        let periodLabel: string
-        let attList: AttendanceRow[]
-
-        if (opts.mode === "custom" && opts.dateStart && opts.dateEnd) {
-          attList = await fetchAttendances(me.id, opts.dateStart, opts.dateEnd)
-          const start = new Date(opts.dateStart + "T00:00:00")
-          const end = new Date(opts.dateEnd + "T23:59:59")
-          daysToExport = []
-          const cur = new Date(start)
-          while (cur <= end) {
-            daysToExport.push(new Date(cur))
-            cur.setDate(cur.getDate() + 1)
-          }
-          periodLabel = `${start.toLocaleDateString("en-US", {
-            month: "short",
-            day: "numeric",
-            year: "numeric",
-          })} - ${end.toLocaleDateString("en-US", {
-            month: "short",
-            day: "numeric",
-            year: "numeric",
-          })}`
-        } else {
-          attList = attendances
-          const last = new Date(year, month + 1, 0)
-          const daysInMonth = last.getDate()
-          daysToExport = []
-          for (let d = 1; d <= daysInMonth; d++) {
-            daysToExport.push(new Date(year, month, d))
-          }
-          periodLabel = currentDate.toLocaleDateString("en-US", {
-            month: "long",
-            year: "numeric",
-          })
-        }
-
-        const exportAttendanceByDate = new Map(attList.map((a) => [a.date, a]))
-
-        const today = new Date()
-        const todayStr = toDateStr(today)
-        const tomorrow = new Date(today)
-        tomorrow.setDate(tomorrow.getDate() + 1)
-        const tomorrowStr = toDateStr(tomorrow)
-
-        const rows: AttendanceExportRow[] = daysToExport.map((date) => {
-          const dateStr = toDateStr(date)
-          const dayOfWeek = date.getDay()
-          const schedule =
-            scheduleByDate.get(dateStr) ?? scheduleByDay.get(dayOfWeek)
-          const hasSchedule = !!schedule
-          const existingAttendance = exportAttendanceByDate.get(dateStr)
-          const status = hasSchedule
-            ? deriveAttendanceStatus({
-                hasSchedule: true,
-                hasTimeIn: !!existingAttendance?.timeIn,
-                hasTimeOut: !!existingAttendance?.timeOut,
-                scheduledTimeIn: schedule.timeIn,
-                actualTimeIn: existingAttendance?.timeIn ?? null,
-                dateStr,
-                todayStr,
-                tomorrowStr,
-                startDateStr: me.startDate ?? null,
-              })
-            : "no-schedule"
-          const statusLabel =
-            status === "no-schedule"
-              ? "No schedule"
-              : status.charAt(0).toUpperCase() + status.slice(1)
-          const timeIn = existingAttendance?.timeIn
-            ? formatTime12(existingAttendance.timeIn)
-            : ""
-          const timeOut = existingAttendance?.timeOut
-            ? formatTime12(existingAttendance.timeOut)
-            : ""
-          const scheduledMinutes = schedule
-            ? calcWorkMinutes(
-                schedule.timeIn,
-                schedule.timeOut,
-                schedule.breakDuration ?? 0
-              )
-            : 0
-          const totalMinutes =
-            existingAttendance?.timeIn &&
-            existingAttendance?.timeOut &&
-            schedule
-              ? calcWorkMinutes(
-                  existingAttendance.timeIn,
-                  existingAttendance.timeOut,
-                  schedule.breakDuration ?? 0
-                )
-              : 0
-          const total =
-            totalMinutes > 0 && scheduledMinutes > 0
-              ? formatTotalWithOvertime(totalMinutes, scheduledMinutes)
-              : ""
-          const dateDisplay =
-            opts.mode === "month" && daysToExport.length > 14
-              ? date.toLocaleDateString("en-US", {
-                  weekday: "short",
-                  month: "short",
-                  day: "numeric",
-                })
-              : date.toLocaleDateString("en-US", {
-                  weekday: "short",
-                  month: "short",
-                  day: "numeric",
-                  year: "numeric",
-                })
-          return {
-            dateDisplay,
-            timeIn,
-            timeOut,
-            status: statusLabel,
-            total,
-            totalMinutes,
-          }
-        })
-
-        let totalRegular = 0
-        let totalOvertime = 0
-        let totalPresent = 0
-        let totalLate = 0
-        let totalAbsent = 0
-
-        for (const row of rows) {
-          if (row.status === "Present") totalPresent++
-          if (row.status === "Late") totalLate++
-          if (row.status === "Absent") totalAbsent++
-        }
-
-        for (const date of daysToExport) {
-          const dateStr = toDateStr(date)
-          const dayOfWeek = date.getDay()
-          const schedule =
-            scheduleByDate.get(dateStr) ?? scheduleByDay.get(dayOfWeek)
-          const existingAttendance = exportAttendanceByDate.get(dateStr)
-          if (
-            schedule &&
-            existingAttendance?.timeIn &&
-            existingAttendance?.timeOut
-          ) {
-            const actualM = calcWorkMinutes(
-              existingAttendance.timeIn,
-              existingAttendance.timeOut,
-              schedule.breakDuration ?? 0
-            )
-            const scheduledM = calcWorkMinutes(
-              schedule.timeIn,
-              schedule.timeOut,
-              schedule.breakDuration ?? 0
-            )
-            totalRegular += Math.min(actualM, scheduledM)
-            if (actualM > scheduledM) totalOvertime += actualM - scheduledM
-          }
-        }
-
-        const summary: ExportSummary = {
-          totalHours: totalRegular,
-          totalOvertime,
-          totalPresent,
-          totalLate,
-          totalAbsent,
-        }
-
-        const pdfBytes = await generateCalendarPdf({
-          userName: me.fullName,
-          periodLabel,
-          rows,
-          summary,
-          supervisorName: opts.supervisorName,
-          supervisorPosition: opts.supervisorPosition,
-        })
-        const blob = new Blob(
-          [
-            pdfBytes.buffer.slice(
-              pdfBytes.byteOffset,
-              pdfBytes.byteOffset + pdfBytes.byteLength
-            ) as ArrayBuffer,
-          ],
-          { type: "application/pdf" }
-        )
-        const url = URL.createObjectURL(blob)
-        window.open(url, "_blank")
-        setTimeout(() => URL.revokeObjectURL(url), 1000)
-      } finally {
-        setIsExporting(false)
-      }
-    },
-    [me, currentDate, scheduleByDay, scheduleByDate, attendances]
-  )
-
   const todayKey = useMemo(() => {
     const t = new Date()
     return `${t.getFullYear()}-${t.getMonth()}-${t.getDate()}`
   }, [])
 
+  const todayIso = toDateStr(new Date())
+
+  const handleHoursRangeFromChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const v = e.target.value
+    if (!v) return
+    setHoursRangeFrom(v)
+    setHoursRangeTo((prev) => (prev && prev < v ? v : prev))
+  }
+
+  const handleHoursRangeToChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const v = e.target.value
+    if (!v) return
+    setHoursRangeTo(v)
+    setHoursRangeFrom((prev) => (prev && prev > v ? v : prev))
+  }
+
   const totalRegularMinutes = useMemo(() => {
+    if (!hoursRangeFrom || !hoursRangeTo) return 0
+    if (hoursRangeFrom > hoursRangeTo) return 0
     let sum = 0
-    for (const { date, isCurrentMonth } of calendarDays) {
-      if (!isCurrentMonth) continue
-      const dateStr = toDateStr(date)
-      const dayOfWeek = date.getDay()
+    let d = parseIsoDateLocal(hoursRangeFrom)
+    const end = parseIsoDateLocal(hoursRangeTo)
+    while (d.getTime() <= end.getTime()) {
+      const dateStr = toDateStr(d)
+      const dayOfWeek = d.getDay()
       const schedule =
         scheduleByDate.get(dateStr) ?? scheduleByDay.get(dayOfWeek)
       const existingAttendance = attendanceByDate.get(dateStr)
@@ -461,9 +357,16 @@ export const UserCalendarPageContent = () => {
         )
         sum += Math.min(actualM, scheduledM)
       }
+      d = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1)
     }
     return sum
-  }, [calendarDays, scheduleByDay, scheduleByDate, attendanceByDate])
+  }, [
+    hoursRangeFrom,
+    hoursRangeTo,
+    scheduleByDay,
+    scheduleByDate,
+    attendanceByDate,
+  ])
 
   if (isLoading && !me) {
     return (
@@ -502,18 +405,116 @@ export const UserCalendarPageContent = () => {
       description="View your attendance calendar"
     >
       <div className="space-y-8">
-        {totalRegularMinutes > 0 && (
-          <PageSection padding="sm">
-            <div className="flex flex-row items-center justify-between gap-4">
-            <p className="text-sm font-medium text-zinc-600 dark:text-zinc-400">
-              Total hours this month
-            </p>
-            <p className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
-              {formatMinutesAsHours(totalRegularMinutes)}
-            </p>
+        <PageSection padding="sm" aria-busy={isLoading}>
+          {isLoading && (
+            <span className="sr-only">Loading calendar data</span>
+          )}
+          <div className="rounded-xl border border-zinc-200/80 bg-zinc-50/50 px-4 py-3 dark:border-zinc-700/80 dark:bg-zinc-800/30">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+              <div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:gap-4 min-w-0">
+                <p className="text-sm font-medium text-zinc-600 dark:text-zinc-400 shrink-0">
+                  Total hours
+                </p>
+                <div className="text-lg font-semibold text-zinc-900 dark:text-zinc-100 min-h-[28px] flex items-center tabular-nums">
+                  {isLoading ? (
+                    <Skeleton className="h-7 w-28 rounded" />
+                  ) : (
+                    formatMinutesAsHours(totalRegularMinutes)
+                  )}
+                </div>
+              </div>
+              <div
+                ref={hoursFilterWrapRef}
+                className="relative inline-flex flex-col items-end shrink-0 self-start sm:self-center"
+              >
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  id="user-calendar-hours-filter-trigger"
+                  aria-expanded={hoursFilterOpen}
+                  aria-controls="user-calendar-hours-filter-panel"
+                  disabled={isLoading}
+                  onClick={() => setHoursFilterOpen((o) => !o)}
+                  className="min-h-[44px] shrink-0 gap-2 whitespace-nowrap"
+                  leftIcon={<SlidersHorizontal className="h-4 w-4 shrink-0" aria-hidden />}
+                  rightIcon={
+                    <ChevronDown
+                      className={`h-4 w-4 shrink-0 transition-transform ${hoursFilterOpen ? "rotate-180" : ""}`}
+                      aria-hidden
+                    />
+                  }
+                >
+                  <span className="hidden sm:inline">Hours range</span>
+                  <span className="sm:hidden">Range</span>
+                </Button>
+                {hoursFilterOpen && (
+                  <div
+                    id="user-calendar-hours-filter-panel"
+                    role="region"
+                    aria-labelledby="user-calendar-hours-filter-trigger"
+                    className="absolute right-0 z-50 mt-2 inline-flex w-[min(calc(100vw-2rem),20rem)] flex-col gap-3 rounded-xl border border-zinc-200 bg-white p-4 shadow-lg dark:border-zinc-700 dark:bg-zinc-900"
+                  >
+                    <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                      Choose any dates (through today). Totals sum regular hours in that range. Data is
+                      fetched to cover the calendar and your range. Reset matches the visible month (1st
+                      through today if it is the current month).
+                    </p>
+                    <div className="inline-flex w-full flex-col gap-3">
+                      <div className="flex flex-col gap-1.5">
+                        <label
+                          htmlFor="user-calendar-hours-from"
+                          className="text-xs font-medium text-zinc-600 dark:text-zinc-400"
+                        >
+                          From
+                        </label>
+                        <input
+                          id="user-calendar-hours-from"
+                          type="date"
+                          value={hoursRangeFrom}
+                          max={hoursRangeTo || todayIso}
+                          onChange={handleHoursRangeFromChange}
+                          disabled={isLoading}
+                          className="h-11 min-h-[44px] w-full rounded-xl border border-zinc-200/80 bg-white px-3 text-sm font-medium text-zinc-900 transition-colors focus:border-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-400/20 disabled:opacity-50 dark:border-zinc-700/80 dark:bg-zinc-800/50 dark:text-zinc-100 dark:focus:border-zinc-500"
+                        />
+                      </div>
+                      <div className="flex flex-col gap-1.5">
+                        <label
+                          htmlFor="user-calendar-hours-to"
+                          className="text-xs font-medium text-zinc-600 dark:text-zinc-400"
+                        >
+                          To
+                        </label>
+                        <input
+                          id="user-calendar-hours-to"
+                          type="date"
+                          value={hoursRangeTo}
+                          min={hoursRangeFrom || undefined}
+                          max={todayIso}
+                          onChange={handleHoursRangeToChange}
+                          disabled={isLoading}
+                          className="h-11 min-h-[44px] w-full rounded-xl border border-zinc-200/80 bg-white px-3 text-sm font-medium text-zinc-900 transition-colors focus:border-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-400/20 disabled:opacity-50 dark:border-zinc-700/80 dark:bg-zinc-800/50 dark:text-zinc-100 dark:focus:border-zinc-500"
+                        />
+                      </div>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => {
+                          applyDefaultHoursRange()
+                        }}
+                        disabled={isLoading}
+                        className="w-full min-h-[44px]"
+                      >
+                        Reset range
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
-          </PageSection>
-        )}
+          </div>
+        </PageSection>
         <PageSection>
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-6">
             <div className="flex items-center gap-1 rounded-xl border border-zinc-200/80 bg-zinc-50/50 p-1 dark:border-zinc-700/80 dark:bg-zinc-800/50">
@@ -523,6 +524,7 @@ export const UserCalendarPageContent = () => {
               size="sm"
               onClick={handlePrevMonth}
               aria-label="Previous month"
+              disabled={isLoading}
               className="rounded-lg h-9 w-9"
             >
               <ChevronLeft className="h-5 w-5" />
@@ -536,6 +538,7 @@ export const UserCalendarPageContent = () => {
               size="sm"
               onClick={handleNextMonth}
               aria-label="Next month"
+              disabled={isLoading}
               className="rounded-lg h-9 w-9"
             >
               <ChevronRight className="h-5 w-5" />
@@ -545,13 +548,17 @@ export const UserCalendarPageContent = () => {
             type="button"
             variant="secondary"
             size="sm"
-            onClick={() => setExportPdfModalOpen(true)}
-            leftIcon={<Download className="h-4 w-4" />}
+            onClick={() => setViewDtrModalOpen(true)}
+            disabled={isLoading}
+            leftIcon={<Eye className="h-4 w-4" />}
           >
-            View Report
+            View DTR
           </Button>
         </div>
 
+        {isLoading ? (
+          <CalendarGridSkeleton />
+        ) : (
         <div className="overflow-x-auto rounded-2xl border border-zinc-200/80 bg-white shadow-sm dark:border-zinc-800/80 dark:bg-zinc-900 dark:shadow-zinc-950/30">
           <div className="min-w-[600px]">
             <div className="grid grid-cols-7 border-b border-zinc-200/80 bg-zinc-50/50 dark:border-zinc-700/80 dark:bg-zinc-800/30">
@@ -591,18 +598,24 @@ export const UserCalendarPageContent = () => {
                         startDateStr: me.startDate ?? null,
                       })
                     : "no-schedule"
+                const isFutureDay = dateStr > todayStr
                 const status: AttendanceStatus =
                   !hasSchedule
                     ? "no-schedule"
-                    : existingAttendance?.status === "absent" && !existingAttendance?.timeIn
-                      ? "absent"
-                      : existingAttendance?.status === "late"
-                        ? "late"
-                        : derivedStatus
+                    : isFutureDay
+                      ? derivedStatus
+                      : existingAttendance?.status === "absent" && !existingAttendance?.timeIn
+                        ? "absent"
+                        : existingAttendance?.status === "late"
+                          ? "late"
+                          : derivedStatus
+                const showActualAttendanceTimes =
+                  !!existingAttendance?.timeIn && !isFutureDay
                 const dateKey = `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`
                 const isToday = dateKey === todayKey
                 const eligibleForCorrection =
                   existingAttendance &&
+                  !isFutureDay &&
                   canRequestCorrection(existingAttendance, status)
 
                 const cellBg =
@@ -652,7 +665,7 @@ export const UserCalendarPageContent = () => {
                     <div className="mt-2 space-y-1.5">
                       {hasSchedule ? (
                         <div className="space-y-0.5 text-xs">
-                          {existingAttendance?.timeIn ? (
+                          {showActualAttendanceTimes ? (
                             <>
                               <p className="leading-tight text-zinc-600 dark:text-zinc-400">
                                 <span className="font-medium text-zinc-500 dark:text-zinc-500">Time in: </span>
@@ -711,6 +724,7 @@ export const UserCalendarPageContent = () => {
             </div>
           </div>
         </div>
+        )}
 
         <div className="flex flex-col gap-6 rounded-xl border border-zinc-200/80 bg-zinc-50/50 p-4 dark:border-zinc-700/80 dark:bg-zinc-900/30">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-6">
@@ -762,14 +776,14 @@ export const UserCalendarPageContent = () => {
         </PageSection>
       </div>
 
-      <ExportPdfModal
-        open={exportPdfModalOpen}
-        onClose={() => setExportPdfModalOpen(false)}
-        onExport={handleExportPdf}
+      <ViewDtrModal
+        open={viewDtrModalOpen}
+        onClose={() => setViewDtrModalOpen(false)}
         currentMonthLabel={monthLabel}
-        disabled={isExporting}
-        schedules={schedules}
-        userStartDate={me?.startDate}
+        userId={me?.id ?? null}
+        month={currentDate.getMonth() + 1}
+        year={currentDate.getFullYear()}
+        fileBaseName={buildDtrExportFileBaseName(me?.fullName ?? "Name", monthLabel)}
       />
 
       <RequestCorrectionModal

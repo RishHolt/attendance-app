@@ -30,3 +30,21 @@ export function formatTime12(v: string | null | undefined): string {
   const minStr = m === 0 ? "" : `:${String(m).padStart(2, "0")}`
   return `${hour12}${minStr} ${ampm}`
 }
+
+/**
+ * 12-hour clock without AM/PM suffix. Minutes always shown (e.g. "12:00", "9:00", "8:20").
+ * Empty string when input is null/empty.
+ */
+export const formatTime12NoAmPm = (v: string | null | undefined): string => {
+  if (v == null || v === "") return ""
+  const s = String(v)
+  let h = 0
+  let m = 0
+  const colonMatch = s.match(/(\d{1,2}):(\d{2})/)
+  if (colonMatch) {
+    h = parseInt(colonMatch[1], 10)
+    m = parseInt(colonMatch[2], 10)
+  }
+  const hour12 = h === 0 ? 12 : h > 12 ? h - 12 : h
+  return `${hour12}:${String(m).padStart(2, "0")}`
+}
