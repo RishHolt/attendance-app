@@ -4,7 +4,6 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useEffect, useState } from "react"
 import {
-  Calendar,
   LayoutDashboard,
   CalendarCheck,
   CalendarRange,
@@ -16,6 +15,7 @@ import { DateTime } from "@/components/ui"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { UserAccountDropdown } from "./user-account-dropdown"
 import { PageTransitionWrapper } from "@/components/page-transition-wrapper"
+import { BrandLogo } from "@/components/brand-logo"
 
 const headerNav = [
   { href: "/user", label: "Dashboard", icon: LayoutDashboard },
@@ -88,9 +88,7 @@ export const UserShell = ({ children, userName }: UserShellProps) => {
             className="flex items-center gap-2"
             onClick={() => setNavOpen(false)}
           >
-            <div className="flex justify-center items-center bg-zinc-900 dark:bg-zinc-100 rounded-lg w-9 h-9 shrink-0">
-              <Calendar className="w-5 h-5 text-white dark:text-zinc-900" />
-            </div>
+            <BrandLogo size={36} />
             <span className="font-semibold text-zinc-900 dark:text-zinc-100 tracking-tight">
               Attendance
             </span>
@@ -141,9 +139,7 @@ export const UserShell = ({ children, userName }: UserShellProps) => {
               href="/user"
               className="flex items-center gap-2 shrink-0 md:ml-0"
             >
-              <div className="flex justify-center items-center bg-zinc-900 dark:bg-zinc-100 rounded-lg w-9 h-9 shrink-0">
-                <Calendar className="w-5 h-5 text-white dark:text-zinc-900" />
-              </div>
+              <BrandLogo size={36} />
               <span className="hidden sm:inline font-semibold text-zinc-900 dark:text-zinc-100 tracking-tight">
                 Attendance
               </span>

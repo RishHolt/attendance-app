@@ -9,6 +9,7 @@ import {
   CardTitle,
 } from "@/components/ui"
 import { ThemeToggle } from "@/components/theme-toggle"
+import { BrandLogo } from "@/components/brand-logo"
 import { LoginForm } from "./login-form"
 
 export const LoginPageContent = () => {
@@ -37,7 +38,10 @@ export const LoginPageContent = () => {
       >
         <Card variant="glass" padding="lg" className="w-full p-6 sm:p-8">
           <CardHeader>
-            <CardTitle>Attendance</CardTitle>
+            <div className="mb-4 flex justify-center">
+              <BrandLogo size={72} />
+            </div>
+            <CardTitle>SDO Attendance</CardTitle>
             <CardDescription>Sign in to your account</CardDescription>
           </CardHeader>
           <Suspense fallback={<div className="h-48 animate-pulse rounded-lg bg-zinc-200/50 dark:bg-zinc-800/50" />}>

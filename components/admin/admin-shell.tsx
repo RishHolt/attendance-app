@@ -10,7 +10,6 @@ import {
   CalendarDays,
   Users,
   Settings,
-  Calendar,
   Menu,
   X,
   BarChart3,
@@ -20,6 +19,7 @@ import { ThemeToggle } from "@/components/theme-toggle"
 import { AccountDropdown } from "./account-dropdown"
 import { Breadcrumbs } from "./breadcrumbs"
 import { PageTransitionWrapper } from "@/components/page-transition-wrapper"
+import { BrandLogo } from "@/components/brand-logo"
 
 const sidebarNav = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
@@ -56,9 +56,7 @@ export const AdminShell = ({ children, userName }: AdminShellProps) => {
     <>
       <div className="flex justify-between items-center gap-3 px-5 border-zinc-200/80 dark:border-zinc-800/80 border-b h-16">
         <div className="flex items-center gap-3 min-w-0">
-          <div className="flex justify-center items-center bg-zinc-900 dark:bg-zinc-100 rounded-lg w-9 h-9 shrink-0">
-            <Calendar className="w-5 h-5 text-white dark:text-zinc-900" />
-          </div>
+          <BrandLogo size={36} />
           <Link
             href="/admin"
             className="font-semibold text-zinc-900 dark:text-zinc-100 truncate tracking-tight"
