@@ -37,19 +37,21 @@ type CalendarCell = {
 
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+const WEEKDAYS_SHORT = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"]
 
-const LEGENDS: { status: AttendanceStatus; label: string; color: string; bg: string }[] = [
-  { status: "present", label: "Present", color: "text-emerald-700 dark:text-emerald-400", bg: "bg-emerald-100 dark:bg-emerald-900/40" },
-  { status: "late", label: "Late", color: "text-amber-700 dark:text-amber-400", bg: "bg-amber-100 dark:bg-amber-900/40" },
-  { status: "absent", label: "Absent", color: "text-red-700 dark:text-red-400", bg: "bg-red-100 dark:bg-red-900/40" },
-  { status: "incomplete", label: "Incomplete", color: "text-orange-700 dark:text-orange-400", bg: "bg-orange-100 dark:bg-orange-900/40" },
-  { status: "upcoming", label: "Upcoming", color: "text-violet-700 dark:text-violet-400", bg: "bg-violet-100 dark:bg-violet-900/40" },
-  { status: "no-schedule", label: "No schedule", color: "text-zinc-500 dark:text-zinc-400", bg: "bg-zinc-100 dark:bg-zinc-800" },
+const LEGENDS: { status: AttendanceStatus; label: string; color: string; bg: string; dot: string }[] = [
+  { status: "present", label: "Present", color: "text-emerald-700 dark:text-emerald-400", bg: "bg-emerald-100 dark:bg-emerald-900/40", dot: "bg-emerald-500" },
+  { status: "late", label: "Late", color: "text-amber-700 dark:text-amber-400", bg: "bg-amber-100 dark:bg-amber-900/40", dot: "bg-amber-500" },
+  { status: "absent", label: "Absent", color: "text-red-700 dark:text-red-400", bg: "bg-red-100 dark:bg-red-900/40", dot: "bg-red-500" },
+  { status: "incomplete", label: "Incomplete", color: "text-orange-700 dark:text-orange-400", bg: "bg-orange-100 dark:bg-orange-900/40", dot: "bg-orange-500" },
+  { status: "today", label: "Today", color: "text-blue-700 dark:text-blue-400", bg: "bg-blue-100 dark:bg-blue-900/40", dot: "bg-blue-500" },
+  { status: "upcoming", label: "Upcoming", color: "text-violet-700 dark:text-violet-400", bg: "bg-violet-100 dark:bg-violet-900/40", dot: "bg-violet-500" },
+  { status: "no-schedule", label: "No schedule", color: "text-zinc-500 dark:text-zinc-400", bg: "bg-zinc-100 dark:bg-zinc-800", dot: "bg-zinc-400" },
 ]
 
-const DATE_LEGENDS: { key: string; label: string; color: string; bg: string; dot: string }[] = [
+const DATE_LEGENDS: { key: string; label: string; color: string; bg: string; dot: string; ring?: string }[] = [
   { key: "prev-month", label: "Previous month", color: "text-zinc-600 dark:text-zinc-400", bg: "bg-zinc-200 dark:bg-zinc-700", dot: "bg-zinc-500" },
-  { key: "today", label: "Today", color: "text-blue-700 dark:text-blue-400", bg: "bg-blue-100 dark:bg-blue-900/40", dot: "bg-blue-500" },
+  { key: "today", label: "Today", color: "text-blue-700 dark:text-blue-400", bg: "bg-blue-50 dark:bg-blue-950/40", dot: "bg-blue-500", ring: "ring-2 ring-blue-500 dark:ring-blue-400" },
   { key: "upcoming", label: "Upcoming", color: "text-violet-700 dark:text-violet-400", bg: "bg-violet-100 dark:bg-violet-900/40", dot: "bg-violet-500" },
   { key: "next-month", label: "Next month", color: "text-zinc-600 dark:text-zinc-400", bg: "bg-zinc-100 dark:bg-zinc-800", dot: "bg-zinc-400" },
 ]
@@ -366,8 +368,7 @@ export const CalendarPageContent = () => {
               startDateStr: selectedUser?.startDate ?? null,
             })
           : "no-schedule"
-      const statusLabel =
-        status === "no-schedule" ? "—" : status.charAt(0).toUpperCase() + status.slice(1)
+      const statusLabel = LEGENDS.find((l) => l.status === status)?.label ?? "—"
       const timeIn = existingAttendance?.timeIn
         ? formatTime12(existingAttendance.timeIn)
         : ""
@@ -482,7 +483,7 @@ export const CalendarPageContent = () => {
     isLoadingUsers || (!!selectedUserId && isLoadingSchedules)
 
   return (
-    <div className="space-y-6 min-w-0 overflow-x-hidden">
+    <div className="min-w-0 space-y-6">
       <PageHeader
         title="Calendar"
         description="View user schedules and attendance"
@@ -504,124 +505,117 @@ export const CalendarPageContent = () => {
           </>
         ) : (
           <>
-        <div className="mb-6 rounded-xl border border-zinc-200/80 bg-zinc-50/50 px-4 py-3 dark:border-zinc-700/80 dark:bg-zinc-800/30">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-            <div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:gap-4 min-w-0">
-              <p className="text-sm font-medium text-zinc-600 dark:text-zinc-400 shrink-0">
+        <div className="mb-6 rounded-xl border border-zinc-200/80 bg-zinc-50/50 px-4 py-4 dark:border-zinc-700/80 dark:bg-zinc-800/30">
+          <div
+            ref={hoursFilterWrapRef}
+            className="relative flex items-center justify-between gap-3"
+          >
+            <div className="flex min-w-0 flex-col gap-0.5">
+              <p className="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
                 Total hours
               </p>
-              <div className="text-lg font-semibold text-zinc-900 dark:text-zinc-100 min-h-[28px] flex items-center tabular-nums">
+              <div className="whitespace-nowrap text-2xl font-bold tabular-nums text-zinc-900 dark:text-zinc-100">
                 {!selectedUserId ? (
                   "—"
                 ) : isLoadingSchedules ? (
-                  <Skeleton className="h-7 w-28 rounded" />
+                  <Skeleton className="h-8 w-24 rounded" />
                 ) : (
                   formatMinutesAsHours(totalRegularMinutes)
                 )}
               </div>
             </div>
-            <div
-              ref={hoursFilterWrapRef}
-              className="relative inline-flex flex-col items-end shrink-0 self-start sm:self-center"
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              id="calendar-hours-filter-trigger"
+              aria-expanded={hoursFilterOpen}
+              aria-controls="calendar-hours-filter-panel"
+              disabled={!selectedUserId || isLoadingSchedules}
+              onClick={() => setHoursFilterOpen((o) => !o)}
+              className="shrink-0 gap-1.5"
+              leftIcon={<SlidersHorizontal className="h-4 w-4 shrink-0" aria-hidden />}
+              rightIcon={
+                <ChevronDown
+                  className={`h-4 w-4 shrink-0 transition-transform ${hoursFilterOpen ? "rotate-180" : ""}`}
+                  aria-hidden
+                />
+              }
             >
-              <Button
-                type="button"
-                variant="secondary"
-                size="sm"
-                id="calendar-hours-filter-trigger"
-                aria-expanded={hoursFilterOpen}
-                aria-controls="calendar-hours-filter-panel"
-                disabled={!selectedUserId || isLoadingSchedules}
-                onClick={() => setHoursFilterOpen((o) => !o)}
-                className="min-h-[44px] shrink-0 gap-2 whitespace-nowrap"
-                leftIcon={<SlidersHorizontal className="h-4 w-4 shrink-0" aria-hidden />}
-                rightIcon={
-                  <ChevronDown
-                    className={`h-4 w-4 shrink-0 transition-transform ${hoursFilterOpen ? "rotate-180" : ""}`}
-                    aria-hidden
-                  />
-                }
+              <span className="hidden sm:inline">Hours range</span>
+            </Button>
+            {hoursFilterOpen && (
+              <div
+                id="calendar-hours-filter-panel"
+                role="region"
+                aria-labelledby="calendar-hours-filter-trigger"
+                className="absolute right-0 top-full z-50 mt-2 w-full max-w-sm flex flex-col gap-4 rounded-xl border border-zinc-200 bg-white p-5 shadow-lg dark:border-zinc-700 dark:bg-zinc-900"
               >
-                <span className="hidden sm:inline">Hours range</span>
-                <span className="sm:hidden">Range</span>
-              </Button>
-              {hoursFilterOpen && (
-                <div
-                  id="calendar-hours-filter-panel"
-                  role="region"
-                  aria-labelledby="calendar-hours-filter-trigger"
-                  className="absolute right-0 z-50 mt-2 inline-flex w-[min(calc(100vw-2rem),20rem)] flex-col gap-3 rounded-xl border border-zinc-200 bg-white p-4 shadow-lg dark:border-zinc-700 dark:bg-zinc-900"
-                >
-                  <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                    Choose any dates (through today). Totals sum regular hours in that range. Data is
-                    fetched to cover the calendar and your range. Reset matches the visible month (1st
-                    through today if it is the current month).
-                  </p>
-                  <div className="inline-flex w-full flex-col gap-3">
-                    <div className="flex flex-col gap-1.5">
-                      <label
-                        htmlFor="calendar-hours-from"
-                        className="text-xs font-medium text-zinc-600 dark:text-zinc-400"
-                      >
-                        From
-                      </label>
-                      <input
-                        id="calendar-hours-from"
-                        type="date"
-                        value={hoursRangeFrom}
-                        max={hoursRangeTo || todayIso}
-                        onChange={handleHoursRangeFromChange}
-                        disabled={!selectedUserId || isLoadingSchedules}
-                        className="h-11 min-h-[44px] w-full rounded-xl border border-zinc-200/80 bg-white px-3 text-sm font-medium text-zinc-900 transition-colors focus:border-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-400/20 disabled:opacity-50 dark:border-zinc-700/80 dark:bg-zinc-800/50 dark:text-zinc-100 dark:focus:border-zinc-500"
-                      />
-                    </div>
-                    <div className="flex flex-col gap-1.5">
-                      <label
-                        htmlFor="calendar-hours-to"
-                        className="text-xs font-medium text-zinc-600 dark:text-zinc-400"
-                      >
-                        To
-                      </label>
-                      <input
-                        id="calendar-hours-to"
-                        type="date"
-                        value={hoursRangeTo}
-                        min={hoursRangeFrom || undefined}
-                        max={todayIso}
-                        onChange={handleHoursRangeToChange}
-                        disabled={!selectedUserId || isLoadingSchedules}
-                        className="h-11 min-h-[44px] w-full rounded-xl border border-zinc-200/80 bg-white px-3 text-sm font-medium text-zinc-900 transition-colors focus:border-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-400/20 disabled:opacity-50 dark:border-zinc-700/80 dark:bg-zinc-800/50 dark:text-zinc-100 dark:focus:border-zinc-500"
-                      />
-                    </div>
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => {
-                        applyDefaultHoursRange()
-                      }}
-                      disabled={!selectedUserId || isLoadingSchedules}
-                      className="w-full min-h-[44px]"
+                <p className="text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">
+                  Choose any dates (through today). Totals sum regular hours in that range. Reset matches the visible month (1st through today if current month).
+                </p>
+                <div className="flex flex-col gap-4">
+                  <div className="flex flex-col gap-2">
+                    <label
+                      htmlFor="calendar-hours-from"
+                      className="text-sm font-medium text-zinc-600 dark:text-zinc-400"
                     >
-                      Reset range
-                    </Button>
+                      From
+                    </label>
+                    <input
+                      id="calendar-hours-from"
+                      type="date"
+                      value={hoursRangeFrom}
+                      max={hoursRangeTo || todayIso}
+                      onChange={handleHoursRangeFromChange}
+                      disabled={!selectedUserId || isLoadingSchedules}
+                      className="h-12 min-h-[48px] w-full rounded-xl border border-zinc-200/80 bg-white px-3 text-base font-medium text-zinc-900 transition-colors focus:border-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-400/20 disabled:opacity-50 dark:border-zinc-700/80 dark:bg-zinc-800/50 dark:text-zinc-100 dark:focus:border-zinc-500"
+                    />
                   </div>
+                  <div className="flex flex-col gap-2">
+                    <label
+                      htmlFor="calendar-hours-to"
+                      className="text-sm font-medium text-zinc-600 dark:text-zinc-400"
+                    >
+                      To
+                    </label>
+                    <input
+                      id="calendar-hours-to"
+                      type="date"
+                      value={hoursRangeTo}
+                      min={hoursRangeFrom || undefined}
+                      max={todayIso}
+                      onChange={handleHoursRangeToChange}
+                      disabled={!selectedUserId || isLoadingSchedules}
+                      className="h-12 min-h-[48px] w-full rounded-xl border border-zinc-200/80 bg-white px-3 text-base font-medium text-zinc-900 transition-colors focus:border-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-400/20 disabled:opacity-50 dark:border-zinc-700/80 dark:bg-zinc-800/50 dark:text-zinc-100 dark:focus:border-zinc-500"
+                    />
+                  </div>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="default"
+                    onClick={applyDefaultHoursRange}
+                    disabled={!selectedUserId || isLoadingSchedules}
+                    className="w-full"
+                  >
+                    Reset range
+                  </Button>
                 </div>
-              )}
-            </div>
+              </div>
+            )}
           </div>
         </div>
-        <div className="flex flex-col gap-4 lg:flex-row lg:justify-between lg:items-center lg:gap-6">
-          <div className="flex flex-1 flex-col gap-3 lg:flex-row lg:items-center lg:gap-6 w-full min-w-0">
-            <div className="flex flex-row items-center gap-3 w-full min-w-0 flex-1">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between lg:gap-6">
+          <div className="flex w-full min-w-0 flex-1 flex-col gap-3 lg:flex-row lg:items-center lg:gap-6">
+            <div className="flex w-full min-w-0 flex-1 flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
               <label
                 htmlFor="calendar-user-search"
-                className="flex shrink-0 items-center gap-2 font-medium text-zinc-700 dark:text-zinc-300 text-sm"
+                className="flex shrink-0 items-center gap-2 text-sm font-medium text-zinc-700 dark:text-zinc-300"
               >
-                <Search className="w-4 h-4 shrink-0" aria-hidden />
+                <Search className="h-4 w-4 shrink-0" aria-hidden />
                 Search user
               </label>
-              <div className="relative flex-1 min-w-0 w-full sm:min-w-[200px] md:min-w-[260px] lg:min-w-[320px]">
+              <div className="relative w-full min-w-0 flex-1 sm:min-w-[200px] md:min-w-[260px] lg:min-w-[320px]">
                 <input
                   id="calendar-user-search"
                   type="text"
@@ -697,8 +691,8 @@ export const CalendarPageContent = () => {
             </div>
           </div>
 
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:gap-4 min-w-0">
-            <div className="flex items-center gap-1 bg-zinc-50/50 dark:bg-zinc-800/50 p-1 border border-zinc-200 dark:border-zinc-700 rounded-xl w-full lg:w-auto justify-center min-w-0">
+          <div className="flex min-w-0 flex-col gap-3 lg:flex-row lg:items-center lg:gap-4">
+            <div className="flex min-w-0 w-full items-center justify-center gap-1 rounded-xl border border-zinc-200 bg-zinc-50/50 p-1 dark:border-zinc-700 dark:bg-zinc-800/50 lg:w-auto">
               <Button
                 type="button"
                 variant="ghost"
@@ -741,17 +735,22 @@ export const CalendarPageContent = () => {
           <CalendarGridSkeleton />
         ) : (
         <div
-          className="bg-zinc-50/30 dark:bg-zinc-900/30 shadow-sm mt-6 md:mt-8 border border-zinc-200 dark:border-zinc-700 rounded-2xl overflow-x-auto -mx-1 px-1 md:mx-0 md:px-0"
+          className="-mx-4 mt-6 overflow-x-auto rounded-2xl border border-zinc-200 bg-zinc-50/30 shadow-sm dark:border-zinc-700 dark:bg-zinc-900/30 md:-mx-6 md:mt-8"
           style={{ WebkitOverflowScrolling: "touch" }}
         >
-          <div className="min-w-[600px]">
-            <div className="grid grid-cols-7 bg-white dark:bg-zinc-800/50 border-zinc-200 dark:border-zinc-700 border-b">
-              {WEEKDAYS.map((day) => (
+            <div className="min-w-[480px] sm:min-w-[540px] md:min-w-[600px]">
+            <div className="grid grid-cols-7 border-b border-zinc-200 bg-white dark:border-zinc-700 dark:bg-zinc-800/50">
+              {WEEKDAYS.map((day, idx) => (
                 <div
                   key={day}
-                  className="px-2 py-3 font-semibold text-zinc-500 dark:text-zinc-400 text-xs text-center uppercase tracking-wider"
+                  role="columnheader"
+                  aria-label={day}
+                  className="px-0.5 py-2 text-center text-[10px] font-semibold uppercase tracking-wider text-zinc-500 sm:px-2 sm:py-3 sm:text-xs dark:text-zinc-400"
                 >
-                  {day}
+                  <span className="sm:hidden" aria-hidden>
+                    {WEEKDAYS_SHORT[idx]}
+                  </span>
+                  <span className="hidden sm:inline">{day}</span>
                 </div>
               ))}
             </div>
@@ -817,7 +816,7 @@ export const CalendarPageContent = () => {
                 return (
                   <div
                     key={i}
-                    className={`group min-h-[110px] border-b border-r border-zinc-200/80 p-3 transition-colors dark:border-zinc-700/80 ${cellBg} ${
+                    className={`group min-h-[100px] border-b border-r border-zinc-200/80 p-1.5 transition-colors sm:min-h-[110px] sm:p-2 md:p-3 dark:border-zinc-700/80 ${cellBg} ${
                       isCurrentMonth && !isToday
                         ? "hover:bg-zinc-50 dark:hover:bg-zinc-800/70"
                         : ""
@@ -825,7 +824,7 @@ export const CalendarPageContent = () => {
                   >
                     <div className="flex items-center justify-between gap-1">
                       <span
-                        className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-sm font-semibold transition-colors ${
+                        className={`inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-xs font-semibold transition-colors sm:h-8 sm:w-8 sm:text-sm ${
                           isToday
                             ? "bg-blue-600 text-white shadow-md dark:bg-blue-500 dark:text-white"
                             : isCurrentMonth
@@ -842,9 +841,9 @@ export const CalendarPageContent = () => {
                               type="button"
                               onClick={() => openAddModal(date, dateLabel)}
                               aria-label={`Add attendance for ${dateLabel}`}
-                              className="flex h-7 w-7 items-center justify-center rounded-md text-zinc-500 transition-colors hover:bg-zinc-200 hover:text-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-700 dark:hover:text-zinc-200"
+                              className="flex h-9 w-9 min-h-[44px] min-w-[44px] items-center justify-center rounded-md text-zinc-500 transition-colors hover:bg-zinc-200 hover:text-zinc-700 sm:h-7 sm:w-7 sm:min-h-0 sm:min-w-0 dark:text-zinc-400 dark:hover:bg-zinc-700 dark:hover:text-zinc-200"
                             >
-                              <Plus className="h-3.5 w-3.5" />
+                              <Plus className="h-4 w-4 sm:h-3.5 sm:w-3.5" />
                             </button>
                           )}
                           {existingAttendance && (
@@ -852,77 +851,65 @@ export const CalendarPageContent = () => {
                               type="button"
                               onClick={() => openEditModal(date, dateLabel, existingAttendance)}
                               aria-label={`Edit attendance for ${dateLabel}`}
-                              className="flex h-7 w-7 items-center justify-center rounded-md text-zinc-500 transition-colors hover:bg-zinc-200 hover:text-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-700 dark:hover:text-zinc-200"
+                              className="flex h-9 w-9 min-h-[44px] min-w-[44px] items-center justify-center rounded-md text-zinc-500 transition-colors hover:bg-zinc-200 hover:text-zinc-700 sm:h-7 sm:w-7 sm:min-h-0 sm:min-w-0 dark:text-zinc-400 dark:hover:bg-zinc-700 dark:hover:text-zinc-200"
                             >
-                              <Pencil className="h-3.5 w-3.5" />
+                              <Pencil className="h-4 w-4 sm:h-3.5 sm:w-3.5" />
                             </button>
                           )}
                         </div>
                       )}
                     </div>
                     {selectedUserId && (
-                      <div className="space-y-1.5 mt-2">
+                      <div className="mt-1.5 space-y-1 sm:mt-2 sm:space-y-1.5">
                         {hasSchedule ? (
-                          <div className="space-y-0.5 text-xs">
+                          <div className="space-y-0.5 text-[10px] sm:text-xs">
                             {showActualAttendanceTimes ? (
                               <>
-                                <p className="text-zinc-600 dark:text-zinc-400 leading-tight">
-                                  <span className="font-medium text-zinc-500 dark:text-zinc-500">Time in: </span>
+                                <p className="leading-tight text-zinc-600 dark:text-zinc-400">
+                                  <span className="font-medium text-zinc-500 dark:text-zinc-500">In: </span>
                                   {formatTime12(existingAttendance.timeIn)}
                                 </p>
-                                <p className="text-zinc-600 dark:text-zinc-400 leading-tight">
-                                  <span className="font-medium text-zinc-500 dark:text-zinc-500">Time out: </span>
+                                <p className="leading-tight text-zinc-600 dark:text-zinc-400">
+                                  <span className="font-medium text-zinc-500 dark:text-zinc-500">Out: </span>
                                   {existingAttendance?.timeOut
                                     ? formatTime12(existingAttendance.timeOut)
                                     : "—"}
                                 </p>
-                                {((schedule.breakDuration ?? 0) > 0 || schedule.breakTime) && (
-                                  <p className="text-zinc-600 dark:text-zinc-400 leading-tight">
-                                    <span className="font-medium text-zinc-500 dark:text-zinc-500">Break: </span>
-                                    {schedule.breakTime
-                                      ? `${formatTime12(schedule.breakTime)} (${schedule.breakDuration ?? 0}h)`
-                                      : `${schedule.breakDuration ?? 0}h`}
+                                {existingAttendance?.timeOut && (
+                                  <p className="leading-tight font-medium text-zinc-600 dark:text-zinc-400">
+                                    <span className="font-medium text-zinc-500 dark:text-zinc-500">Total: </span>
+                                    {formatTotalWithOvertime(
+                                      calcWorkMinutes(
+                                        existingAttendance!.timeIn!,
+                                        existingAttendance.timeOut,
+                                        schedule.breakDuration ?? 0
+                                      ),
+                                      calcWorkMinutes(
+                                        schedule.timeIn,
+                                        schedule.timeOut,
+                                        schedule.breakDuration ?? 0
+                                      )
+                                    )}
                                   </p>
                                 )}
                               </>
                             ) : (
-                              <p className="text-zinc-500 dark:text-zinc-500 leading-tight italic">
-                                Scheduled: {formatTime12(schedule.timeIn)} – {formatTime12(schedule.timeOut)}
-                                {((schedule.breakDuration ?? 0) > 0 || schedule.breakTime) &&
-                                  ` • Break ${schedule.breakTime ? formatTime12(schedule.breakTime) + " " : ""}(${schedule.breakDuration ?? 0}h)`}
-                              </p>
-                            )}
-                            {(showActualAttendanceTimes && existingAttendance?.timeOut) && (
-                              <p className="text-zinc-600 dark:text-zinc-400 leading-tight font-medium">
-                                <span className="font-medium text-zinc-500 dark:text-zinc-500">Total: </span>
-                                {formatTotalWithOvertime(
-                                  calcWorkMinutes(
-                                    existingAttendance!.timeIn!,
-                                    existingAttendance.timeOut,
-                                    schedule.breakDuration ?? 0
-                                  ),
-                                  calcWorkMinutes(
-                                    schedule.timeIn,
-                                    schedule.timeOut,
-                                    schedule.breakDuration ?? 0
-                                  )
-                                )}
+                              <p className="leading-tight italic text-zinc-500 dark:text-zinc-500">
+                                {formatTime12(schedule.timeIn)} – {formatTime12(schedule.timeOut)}
                               </p>
                             )}
                           </div>
                         ) : (
-                          <p className="text-zinc-400 dark:text-zinc-500 text-xs italic leading-tight">
+                          <p className="text-[10px] italic leading-tight text-zinc-400 sm:text-xs dark:text-zinc-500">
                             No schedule
                           </p>
                         )}
                         <span
-                          className={`inline-flex rounded-md px-2 py-0.5 text-xs font-medium ${
+                          className={`inline-flex max-w-full rounded-md px-1.5 py-0.5 text-[10px] font-medium sm:px-2 sm:text-xs ${
                             LEGENDS.find((l) => l.status === status)?.bg ?? ""
                           } ${LEGENDS.find((l) => l.status === status)?.color ?? ""}`}
                         >
-                          {status === "no-schedule"
-                            ? "—"
-                            : status.charAt(0).toUpperCase() + status.slice(1)}
+                          {LEGENDS.find((l) => l.status === status)?.label ?? "—"}
                         </span>
                       </div>
                     )}
@@ -942,25 +929,12 @@ export const CalendarPageContent = () => {
               Attendance
             </span>
             <div className="flex flex-wrap gap-2 min-w-0">
-              {LEGENDS.map(({ status, label, bg, color }) => (
+              {LEGENDS.map(({ status, label, bg, color, dot }) => (
                 <span
                   key={status}
                   className={`inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-medium shadow-sm ${bg} ${color}`}
                 >
-                  <span
-                    className={`h-2.5 w-2.5 shrink-0 rounded-full ${
-                      status === "present"
-                        ? "bg-emerald-500"
-                        : status === "late"
-                          ? "bg-amber-500"
-                          : status === "absent"
-                            ? "bg-red-500"
-                            : status === "upcoming"
-                              ? "bg-violet-500"
-                              : "bg-zinc-400"
-                    }`}
-                    aria-hidden
-                  />
+                  <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${dot}`} aria-hidden />
                   {label}
                 </span>
               ))}
@@ -971,10 +945,10 @@ export const CalendarPageContent = () => {
               Date
             </span>
             <div className="flex flex-wrap gap-2 min-w-0">
-              {DATE_LEGENDS.map(({ key, label, bg, color, dot }) => (
+              {DATE_LEGENDS.map(({ key, label, bg, color, dot, ring }) => (
                 <span
                   key={key}
-                  className={`inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-medium shadow-sm ${bg} ${color}`}
+                  className={`inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-medium shadow-sm ${bg} ${color} ${ring ?? ""}`}
                 >
                   <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${dot}`} aria-hidden />
                   {label}

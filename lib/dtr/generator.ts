@@ -3,6 +3,13 @@ import { DOMParser, XMLSerializer } from '@xmldom/xmldom'
 import path from 'path'
 import fs from 'fs'
 import { DTRData } from './types'
+import {
+  type PageLayoutTwips,
+  type PaperSizeId,
+  DEFAULT_PAPER_SIZE,
+  PAGE_LAYOUTS,
+  getContentWidthTwips,
+} from './paper'
 
 const W = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'
 
@@ -192,6 +199,17 @@ const ensureTableJc = (tbl: Element, val: 'left' | 'right' | 'center', doc: Docu
   jc.setAttributeNS(W, 'w:val', val)
 }
 
+/**
+ * The template’s first cell uses `tcMar` with right padding toward the gap. The second cell is a clone,
+ * so the same right margin sits on the outer page edge — extra white space on the right vs the left.
+ */
+const stripTcMarFromCell = (tc: Element) => {
+  const tcPr = getDirectChildren(tc, 'tcPr')[0]
+  if (!tcPr) return
+  const tcMar = getDirectChildren(tcPr, 'tcMar')[0]
+  if (tcMar) tcMar.parentNode?.removeChild(tcMar)
+}
+
 const ensureTcW = (cell: Element, widthStr: string, doc: Document) => {
   let tcPr = getDirectChildren(cell, 'tcPr')[0]
   if (!tcPr) {
@@ -270,11 +288,51 @@ const fillCell = (cell: Element, data: DTRData, doc: Document) => {
   setCellTextArial(totalCells[2], data.total_work_minutes, doc)
 }
 
-const fixOuterTable = (body: Element, doc: Document) => {
-  const CONTENT_W = 10546
+const applySectionPageProperties = (body: Element, doc: Document, layout: PageLayoutTwips) => {
+  const sectPr = getDirectChildren(body, 'sectPr')[0]
+  if (!sectPr) return
+  let pgSz = getDirectChildren(sectPr, 'pgSz')[0]
+  if (!pgSz) {
+    pgSz = doc.createElementNS(W, 'w:pgSz')
+    sectPr.insertBefore(pgSz, sectPr.firstChild)
+  }
+  pgSz.setAttributeNS(W, 'w:w', String(layout.pgSzW))
+  pgSz.setAttributeNS(W, 'w:h', String(layout.pgSzH))
+  let pgMar = getDirectChildren(sectPr, 'pgMar')[0]
+  if (!pgMar) {
+    pgMar = doc.createElementNS(W, 'w:pgMar')
+    sectPr.appendChild(pgMar)
+  }
+  pgMar.setAttributeNS(W, 'w:top', String(layout.pgMarTop))
+  pgMar.setAttributeNS(W, 'w:right', String(layout.pgMarRight))
+  pgMar.setAttributeNS(W, 'w:bottom', String(layout.pgMarBottom))
+  pgMar.setAttributeNS(W, 'w:left', String(layout.pgMarLeft))
+  pgMar.setAttributeNS(W, 'w:header', String(layout.header))
+  pgMar.setAttributeNS(W, 'w:footer', String(layout.footer))
+  pgMar.setAttributeNS(W, 'w:gutter', String(layout.gutter))
+}
+
+const fixOuterTable = (body: Element, doc: Document, contentWidthTwips: number) => {
+  const CONTENT_W = contentWidthTwips
   const CELL_W = Math.floor(CONTENT_W / 2)
-  /** Space between the two DTR columns (twips); keeps total row width = CONTENT_W */
+  /**
+   * Must match `w:tblW` on the inner attendance table in `public/templates/DTR-template.docx`.
+   * Row width is fixed; gap + both columns must fit. Raising GAP above (CONTENT_W - 2 * INNER_DTR_TABLE_W)
+   * makes cells narrower than this table — Word/preview may ignore widths, so spacing changes look invisible.
+   */
+  const INNER_DTR_TABLE_W = 4823
+  /** Space between the two DTR columns (twips); max ≈ CONTENT_W - 2 * INNER_DTR_TABLE_W */
   const GAP = 800
+  /**
+   * Horizontal placement of the whole outer table in the page content area (`w:jc` on outer `tblPr`).
+   * `center` balances left/right space in the content area; `left` leaves more empty space on the right (default block layout).
+   */
+  const OUTER_TABLE_PAGE_ALIGN: 'left' | 'center' | 'right' = 'center'
+  /**
+   * Equal-width data columns keep left/right spacing around each DTR consistent. (Asymmetric widths
+   * — e.g. wider left cell — pushed one form visually without matching the other.)
+   * Needs COL_W >= INNER_DTR_TABLE_W; with default CONTENT_W/GAP, (10546-800)/2 = 4873.
+   */
   const COL_W = Math.floor((CONTENT_W - GAP) / 2)
 
   const outerTbl = getAll(body, 'tbl')[0]
@@ -284,12 +342,17 @@ const fixOuterTable = (body: Element, doc: Document) => {
   if (tblPr) {
     const tblW = getDirectChildren(tblPr, 'tblW')[0]
     if (tblW) tblW.setAttributeNS(W, 'w:w', String(CONTENT_W))
-    const jc = getDirectChildren(tblPr, 'jc')[0]
-    if (jc) jc.parentNode?.removeChild(jc)
   }
+  ensureTableJc(outerTbl, OUTER_TABLE_PAGE_ALIGN, doc)
 
   const outerRow = getDirectChildren(outerTbl, 'tr')[0]
   if (!outerRow) return
+
+  const trPr = getDirectChildren(outerRow, 'trPr')[0]
+  if (trPr) {
+    const trJc = getDirectChildren(trPr, 'jc')[0]
+    if (trJc) trJc.parentNode?.removeChild(trJc)
+  }
 
   const tblGrid = getDirectChildren(outerTbl, 'tblGrid')[0]
   const outerCells = getDirectChildren(outerRow, 'tc')
@@ -324,15 +387,24 @@ const fixOuterTable = (body: Element, doc: Document) => {
     if (w) ensureTcW(cellsFinal[i], w, doc)
   }
 
-  /** Both DTR tables stay left-aligned in their cells. Right `w:jc` on the 2nd table made “For the month of…” look centered in Word/preview; spacing comes from the gap column. */
+  /**
+   * Clone of the first cell keeps `tcMar` with right padding; on the outer right edge that reads as
+   * extra page margin. Strip only the last data cell (not the first — preserves gap-side padding on the left DTR).
+   */
+  const lastOuterCell = cellsFinal[cellsFinal.length - 1]
+  if (lastOuterCell) stripTcMarFromCell(lastOuterCell)
+
+  /**
+   * Inner tables left in both cells so attendance blocks and footer paragraphs share the same cell origin.
+   */
   cellsFinal.forEach((cell) => {
     getDirectChildren(cell, 'tbl').forEach((tbl) => ensureTableJc(tbl, 'left', doc))
   })
 }
 
 /** One DTR column only (preview): remove duplicate side and full-width the remaining cell */
-const fixOuterTableSingleColumn = (body: Element) => {
-  const CONTENT_W = 10546
+const fixOuterTableSingleColumn = (body: Element, contentWidthTwips: number) => {
+  const CONTENT_W = contentWidthTwips
   const outerTbl = getAll(body, 'tbl')[0]
   if (!outerTbl) return
 
@@ -373,6 +445,8 @@ const fixOuterTableSingleColumn = (body: Element) => {
 export type GenerateDTROptions = {
   /** Single filled column (for preview); export uses two copies per form */
   singleColumn?: boolean
+  /** Page size drives `sectPr` pgSz/pgMar and the outer table width (content area). */
+  paperSize?: PaperSizeId
 }
 
 export const generateDTR = async (
@@ -380,6 +454,10 @@ export const generateDTR = async (
   options?: GenerateDTROptions
 ): Promise<Buffer> => {
   const singleColumn = options?.singleColumn === true
+  const paperSize = options?.paperSize ?? DEFAULT_PAPER_SIZE
+  const pageLayout = PAGE_LAYOUTS[paperSize]
+  const contentWidthTwips = getContentWidthTwips(pageLayout)
+
   const templatePath = path.join(process.cwd(), 'public', 'templates', 'DTR-template.docx')
   const templateBuf = fs.readFileSync(templatePath)
 
@@ -392,15 +470,20 @@ export const generateDTR = async (
   const root = doc.documentElement
 
   const body = getAll(root, 'body')[0]
+  if (!body) throw new Error('Invalid DTR template: missing w:body')
+  applySectionPageProperties(body, doc, pageLayout)
+
   const outerTbl = getDirectChildren(body, 'tbl')[0]
+  if (!outerTbl) throw new Error('Invalid DTR template: missing outer table')
   const outerRow = getDirectChildren(outerTbl, 'tr')[0]
+  if (!outerRow) throw new Error('Invalid DTR template: missing outer row')
   const cells = getDirectChildren(outerRow, 'tc')
   const leftCell = cells[0]
   const rightCell = cells[1]
 
   if (singleColumn) {
     fillCell(leftCell, data, doc)
-    fixOuterTableSingleColumn(root)
+    fixOuterTableSingleColumn(root, contentWidthTwips)
   } else {
     const leftClone = leftCell.cloneNode(true) as Element
     rightCell.parentNode?.replaceChild(leftClone, rightCell)
@@ -410,7 +493,7 @@ export const generateDTR = async (
     fillCell(newCells[0], data, doc)
     fillCell(newCells[1], data, doc)
 
-    fixOuterTable(root, doc)
+    fixOuterTable(root, doc, contentWidthTwips)
   }
 
   removeInstructionPageAfterDtrTable(body)

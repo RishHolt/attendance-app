@@ -178,8 +178,8 @@ export const UserShell = ({ children, userName }: UserShellProps) => {
           </div>
         </header>
 
-        <main className="flex-1 p-3 sm:p-6 overflow-auto">
-          <div className="mx-auto max-w-7xl w-full">
+        <main className="min-w-0 flex-1 overflow-auto p-3 sm:p-6">
+          <div className="mx-auto w-full min-w-0 max-w-7xl">
             <PageTransitionWrapper>
               {children}
             </PageTransitionWrapper>

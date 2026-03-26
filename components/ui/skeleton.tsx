@@ -187,20 +187,27 @@ export const CalendarToolbarSkeleton = () => {
   )
 }
 
+type CalendarGridSkeletonProps = {
+  /** Negative horizontal margin to align with page card padding (admin: p-4/md:p-6, user section: p-6). */
+  bleed?: "admin" | "user"
+}
+
 /** Full calendar grid placeholder (6×7 cells, matches visible month grid). */
-export const CalendarGridSkeleton = () => {
+export const CalendarGridSkeleton = ({ bleed = "admin" }: CalendarGridSkeletonProps) => {
+  const bleedClass = bleed === "user" ? "-mx-6" : "-mx-4 md:-mx-6"
   return (
     <div
-      className="bg-zinc-50/30 dark:bg-zinc-900/30 shadow-sm mt-6 md:mt-8 border border-zinc-200 dark:border-zinc-700 rounded-2xl overflow-x-auto -mx-1 px-1 md:mx-0 md:px-0"
+      className={`${bleedClass} mt-6 overflow-x-auto rounded-2xl border border-zinc-200 bg-zinc-50/30 shadow-sm dark:border-zinc-700 dark:bg-zinc-900/30 md:mt-8`}
+      style={{ WebkitOverflowScrolling: "touch" }}
     >
-      <div className="min-w-[600px]">
-        <div className="grid grid-cols-7 bg-white dark:bg-zinc-800/50 border-zinc-200 dark:border-zinc-700 border-b">
+      <div className="min-w-[480px] sm:min-w-[540px] md:min-w-[600px]">
+        <div className="grid grid-cols-7 border-b border-zinc-200 bg-white dark:border-zinc-700 dark:bg-zinc-800/50">
           {Array.from({ length: 7 }).map((_, i) => (
             <div
               key={i}
-              className="px-2 py-3 text-center"
+              className="px-0.5 py-2 text-center sm:px-2 sm:py-3"
             >
-              <Skeleton className="h-4 w-8 mx-auto" variant="text" />
+              <Skeleton className="mx-auto h-3 w-6 sm:h-4 sm:w-8" variant="text" />
             </div>
           ))}
         </div>
@@ -208,10 +215,10 @@ export const CalendarGridSkeleton = () => {
           {Array.from({ length: 42 }).map((_, i) => (
             <div
               key={i}
-              className="min-h-[110px] border-b border-r border-zinc-200/80 p-3 dark:border-zinc-700/80 bg-white dark:bg-zinc-900"
+              className="min-h-[100px] border-b border-r border-zinc-200/80 bg-white p-1.5 dark:border-zinc-700/80 dark:bg-zinc-900 sm:min-h-[110px] sm:p-2 md:p-3"
             >
-              <Skeleton className="h-8 w-8 rounded-lg" />
-              <div className="mt-2 space-y-1.5">
+              <Skeleton className="h-7 w-7 rounded-lg sm:h-8 sm:w-8" />
+              <div className="mt-1.5 space-y-1 sm:mt-2 sm:space-y-1.5">
                 <Skeleton className="h-3 w-full" variant="text" />
                 <Skeleton className="h-3 w-4/5" variant="text" />
                 <Skeleton className="h-5 w-14 rounded-md" />

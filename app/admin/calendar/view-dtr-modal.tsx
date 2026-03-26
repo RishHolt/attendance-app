@@ -155,7 +155,6 @@ export const ViewDtrModal = ({
     const html = `<!DOCTYPE html><html><head><meta charset="utf-8"/><title></title>
 <style>
   body{font-family:Arial,Helvetica,sans-serif;margin:12px;padding:0;color:#111;background:#fff}
-  /* docx-preview adds box-shadow on .docx / .docx-page — prints as a dark band at the top */
   .docx-wrapper{
     background:#fff!important;
     background-image:none!important;
@@ -166,12 +165,30 @@ export const ViewDtrModal = ({
     text-shadow:none!important;
   }
   @media print{
+    html,body{height:auto!important;overflow:visible!important}
     body{margin:0;padding:0}
     *{box-shadow:none!important;filter:none!important}
-    .docx-wrapper,.docx-wrapper>section.docx,section.docx,.docx,.docx-page{
+    /* docx-preview sets section min-height to full page — that reserves a second blank page when printing */
+    [class$="-wrapper"]{
+      display:block!important;
+      padding:0!important;
+      margin:0!important;
+      min-height:0!important;
+      align-items:stretch!important;
+    }
+    [class$="-wrapper"]>section{
+      min-height:auto!important;
+      height:auto!important;
+      max-height:none!important;
+      overflow:visible!important;
+      margin:0!important;
+      margin-bottom:0!important;
+      page-break-after:auto!important;
+    }
+    [class$="-wrapper"]>section>article{min-height:0!important;margin-bottom:0!important}
+    [class$="-wrapper"],[class$="-wrapper"]>section{
       box-shadow:none!important;
       filter:none!important;
-      margin:0!important;
     }
   }
 </style></head><body>${el.innerHTML}</body></html>`
@@ -257,8 +274,7 @@ export const ViewDtrModal = ({
           )}
         </div>
         <p className="text-xs text-zinc-500 dark:text-zinc-400">
-          Preview is for reference only. Use Export to download the document. For printing, use your browser’s print
-          options as needed.
+          Use Export to download the document.
         </p>
       </div>
     </Modal>

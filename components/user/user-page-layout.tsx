@@ -15,7 +15,7 @@ export const UserPageLayout = ({
   children,
 }: UserPageLayoutProps) => {
   return (
-    <div className="space-y-8">
+    <div className="min-w-0 space-y-6 sm:space-y-8">
       <PageHeader title={title} description={description} actions={actions} />
       {children}
     </div>

@@ -5,6 +5,7 @@ export type AttendanceStatus =
   | "late"
   | "absent"
   | "incomplete"
+  | "today"
   | "upcoming"
   | "no-schedule"
 
@@ -54,6 +55,10 @@ export function deriveAttendanceStatus(input: DeriveStatusInput): AttendanceStat
 
   const isPastDate = dateStr < todayStr
   if (isPastDate && startDateStr != null && dateStr >= startDateStr) return "absent"
+
+  // Only remaining case: dateStr === todayStr with no time-in yet.
+  // The user is scheduled today but hasn't clocked in yet.
+  if (dateStr === todayStr) return "today"
 
   return "no-schedule"
 }

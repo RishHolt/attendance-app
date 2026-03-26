@@ -141,9 +141,22 @@ export async function GET(
       .lte("attendance_date", to)
     const existingDates = new Set((existingAttByDate ?? []).map((r) => r.attendance_date))
 
+    // Clean up any phantom absent records that were created for today
+    // before this fix (no time_in, no time_out — user never actually clocked in).
+    await supabase
+      .from("attendances")
+      .delete()
+      .eq("user_id", userId)
+      .eq("attendance_date", todayStr)
+      .eq("status", "absent")
+      .is("time_in", null)
+      .is("time_out", null)
+
     const toInsert: { user_id: string; attendance_date: string; status: string }[] = []
     for (const dateStr of scheduledDates) {
-      if (dateStr > todayStr) continue
+      // Only backfill strictly past dates — never today, because the user may
+      // still clock in later and marking them absent at e.g. 4 AM is wrong.
+      if (dateStr >= todayStr) continue
       if (startDate != null && dateStr < startDate) continue
       if (existingDates.has(dateStr)) continue
       toInsert.push({

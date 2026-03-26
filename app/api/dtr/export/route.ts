@@ -5,8 +5,8 @@ import { generateDTR } from '@/lib/dtr/generator'
 import { createClient } from '@/lib/supabase/server'
 import { formatTime12NoAmPm } from '@/lib/format-time'
 import { calcWorkMinutes } from '@/lib/time-calc'
-import { formatRegularDaysFromSchedule } from '@/lib/dtr/format-regular-days'
 import { buildDtrExportFileBaseName } from '@/lib/dtr/export-filename'
+import { parsePaperSize } from '@/lib/dtr/paper'
 import type { DTRData, DTRRecord } from '@/lib/dtr/types'
 
 const parseTimeToMinutes = (t: string | null | undefined): number => {
@@ -25,12 +25,14 @@ const minutesToHHMM = (totalMins: number): string => {
 
 export async function POST(req: NextRequest) {
   try {
-    const { userId, month, year, singleColumn } = await req.json() as {
+    const { userId, month, year, singleColumn, paperSize } = await req.json() as {
       userId: string
       month: number
       year: number
       /** true = one DTR block (preview); false/omit = full document with duplicate columns */
       singleColumn?: boolean
+      /** a4 | letter | folio | legal — drives Word section page size and table content width */
+      paperSize?: string
     }
 
     if (!userId || !month || !year) {
@@ -109,6 +111,10 @@ export async function POST(req: NextRequest) {
     let totalRegularMinutesMonth = 0
     const records: DTRRecord[] = []
     const daysInMonth = endDate.getDate()
+    /** Mon–Fri present days in month (scheduled days with attendance, not absent) */
+    let regularPresentCount = 0
+    /** Saturday present days in month */
+    let saturdayPresentCount = 0
 
     for (let day = 1; day <= daysInMonth; day++) {
       const d = new Date(year, month - 1, day)
@@ -124,6 +130,11 @@ export async function POST(req: NextRequest) {
 
       const isAbsent =
         att != null && String(att.status ?? '').toLowerCase() === 'absent'
+      const isPresentDay = att != null && !isAbsent
+      if (isPresentDay) {
+        if (dayOfWeek >= 1 && dayOfWeek <= 5) regularPresentCount++
+        else if (dayOfWeek === 6) saturdayPresentCount++
+      }
 
       if (isAbsent) {
         records.push({
@@ -200,16 +211,11 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    const saturdayCount = records.filter((_, i) => {
-      const d = new Date(year, month - 1, records[i].day)
-      return d.getDay() === 6
-    }).length
-
     const dtrData: DTRData = {
       name: user.full_name,
       month: monthLabel,
-      regular_days: formatRegularDaysFromSchedule(scheduleRows),
-      saturdays: saturdayCount > 0 ? String(saturdayCount) : 'N/A',
+      regular_days: regularPresentCount > 0 ? String(regularPresentCount) : '',
+      saturdays: saturdayPresentCount > 0 ? String(saturdayPresentCount) : '',
       total_work_hours: String(Math.floor(totalRegularMinutesMonth / 60)),
       total_work_minutes: String(totalRegularMinutesMonth % 60),
       records,
@@ -217,6 +223,7 @@ export async function POST(req: NextRequest) {
 
     const docxBuffer = await generateDTR(dtrData, {
       singleColumn: singleColumn === true,
+      paperSize: parsePaperSize(paperSize),
     })
     const filename = `${buildDtrExportFileBaseName(user.full_name, monthLabel)}.docx`
 
