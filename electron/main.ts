@@ -1,13 +1,19 @@
-import { app, BrowserWindow, screen } from "electron"
-import { spawn, ChildProcess } from "child_process"
+import { app, BrowserWindow, screen, utilityProcess } from "electron"
+import type { UtilityProcess } from "electron"
 import path from "path"
 import net from "net"
+
+const gotLock = app.requestSingleInstanceLock()
+if (!gotLock) {
+  app.quit()
+  process.exit(0)
+}
 
 const isDev = process.env.NODE_ENV === "development"
 const DEV_PORT = 3000
 
 let mainWindow: BrowserWindow | null = null
-let serverProcess: ChildProcess | null = null
+let serverChild: UtilityProcess | null = null
 
 const getFreePort = (): Promise<number> =>
   new Promise((resolve, reject) => {
@@ -44,9 +50,11 @@ const waitForServer = (port: number, retries = 50, delay = 300): Promise<void> =
 
 const startProductionServer = async (): Promise<number> => {
   const port = await getFreePort()
-  const serverPath = path.join(process.resourcesPath, "standalone", "server.js")
+  const standaloneDir = path.join(process.resourcesPath, "standalone")
+  const serverPath = path.join(standaloneDir, "server.js")
 
-  serverProcess = spawn(process.execPath, [serverPath], {
+  serverChild = utilityProcess.fork(serverPath, [], {
+    cwd: standaloneDir,
     env: {
       ...process.env,
       NODE_ENV: "production",
@@ -54,23 +62,31 @@ const startProductionServer = async (): Promise<number> => {
       HOSTNAME: "127.0.0.1",
     },
     stdio: "pipe",
+    serviceName: "next-server",
   })
 
-  serverProcess.stdout?.on("data", (data: Buffer) => {
+  serverChild.stdout?.on("data", (data: Buffer) => {
     console.log(`[server] ${data.toString()}`)
   })
 
-  serverProcess.stderr?.on("data", (data: Buffer) => {
+  serverChild.stderr?.on("data", (data: Buffer) => {
     console.error(`[server] ${data.toString()}`)
   })
 
-  serverProcess.on("close", (code: number | null) => {
+  serverChild.on("exit", (code: number) => {
     console.log(`[server] exited with code ${code}`)
-    serverProcess = null
+    serverChild = null
   })
 
-  await waitForServer(port)
+  await waitForServer(port, 100, 300)
   return port
+}
+
+const killServer = () => {
+  if (serverChild) {
+    serverChild.kill()
+    serverChild = null
+  }
 }
 
 const createWindow = async () => {
@@ -103,25 +119,47 @@ const createWindow = async () => {
     mainWindow = null
   })
 
-  let url: string
+  try {
+    let url: string
 
-  if (isDev) {
-    url = `http://localhost:${DEV_PORT}`
-  } else {
-    const port = await startProductionServer()
-    url = `http://127.0.0.1:${port}`
+    if (isDev) {
+      url = `http://localhost:${DEV_PORT}`
+    } else {
+      const port = await startProductionServer()
+      url = `http://127.0.0.1:${port}`
+    }
+
+    await mainWindow.loadURL(url)
+  } catch (err) {
+    const standaloneDir = path.join(process.resourcesPath, "standalone")
+    const hasServerJs = require("fs").existsSync(path.join(standaloneDir, "server.js"))
+    const hasNodeModules = require("fs").existsSync(path.join(standaloneDir, "node_modules"))
+    const hasEnv = require("fs").existsSync(path.join(standaloneDir, ".env.local"))
+
+    mainWindow.show()
+    mainWindow.webContents.loadURL(
+      `data:text/html;charset=utf-8,${encodeURIComponent(`<h2>Failed to start</h2>
+<pre>${String(err)}</pre>
+<h3>Debug info</h3>
+<pre>resourcesPath: ${process.resourcesPath}
+server.js exists: ${hasServerJs}
+node_modules exists: ${hasNodeModules}
+.env.local exists: ${hasEnv}</pre>`)}`
+    )
   }
-
-  await mainWindow.loadURL(url)
 }
+
+app.on("second-instance", () => {
+  if (mainWindow) {
+    if (mainWindow.isMinimized()) mainWindow.restore()
+    mainWindow.focus()
+  }
+})
 
 app.whenReady().then(createWindow)
 
 app.on("window-all-closed", () => {
-  if (serverProcess) {
-    serverProcess.kill()
-    serverProcess = null
-  }
+  killServer()
   app.quit()
 })
 
@@ -132,8 +170,5 @@ app.on("activate", () => {
 })
 
 app.on("before-quit", () => {
-  if (serverProcess) {
-    serverProcess.kill()
-    serverProcess = null
-  }
+  killServer()
 })
