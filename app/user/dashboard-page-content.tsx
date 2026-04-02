@@ -53,11 +53,14 @@ const getGreeting = () => {
 const getTodayISO = () =>
   new Date().toISOString().split("T")[0] ?? ""
 
-const getThisWeekRange = () => {
+const getThisMonthRange = () => {
   const now = new Date()
   const to = now.toISOString().split("T")[0] ?? ""
-  const fromDate = new Date(now.getTime() - 6 * 24 * 60 * 60 * 1000)
-  const from = fromDate.toISOString().split("T")[0] ?? ""
+  const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+  const year = firstOfMonth.getFullYear()
+  const month = String(firstOfMonth.getMonth() + 1).padStart(2, "0")
+  const day = String(firstOfMonth.getDate()).padStart(2, "0")
+  const from = `${year}-${month}-${day}`
   return { from, to }
 }
 
@@ -126,8 +129,8 @@ const formatDateShort = (dateStr: string) => {
 export const DashboardPageContent = () => {
   const [me, setMe] = useState<MeUser | null>(null)
   const [todayAttendance, setTodayAttendance] = useState<AttendanceRow | null>(null)
-  const [weekRows, setWeekRows] = useState<AttendanceRow[]>([])
-  const [weekStats, setWeekStats] = useState({
+  const [monthRows, setMonthRows] = useState<AttendanceRow[]>([])
+  const [monthStats, setMonthStats] = useState({
     present: 0,
     late: 0,
     absent: 0,
@@ -153,11 +156,11 @@ export const DashboardPageContent = () => {
       setMe(meData)
       const userId = meData.id
       const today = getTodayISO()
-      const { from, to } = getThisWeekRange()
+      const { from, to } = getThisMonthRange()
 
-      const [attTodayRes, attWeekRes, schedRes] = await Promise.all([
+      const [attTodayRes, attMonthRes, schedRes] = await Promise.all([
         fetch(`/api/users/${userId}/attendances?from=${today}&to=${today}`),
-        fetch(`/api/users/${userId}/attendances?from=${from}&to=${to}&page=1&limit=10`),
+        fetch(`/api/users/${userId}/attendances?from=${from}&to=${to}&page=1&limit=31`),
         fetch(`/api/users/${userId}/schedules`),
       ])
 
@@ -184,10 +187,10 @@ export const DashboardPageContent = () => {
         setTodayAttendance(null)
       }
 
-      if (attWeekRes.ok) {
-        const data = await attWeekRes.json()
+      if (attMonthRes.ok) {
+        const data = await attMonthRes.json()
         const rows = (data?.rows ?? []) as AttendanceRow[]
-        setWeekRows(rows)
+        setMonthRows(rows)
         const stats = rows.reduce(
           (acc, row) => {
             const status = computeDisplayStatus(row, scheduleRows)
@@ -200,10 +203,10 @@ export const DashboardPageContent = () => {
           },
           { present: 0, late: 0, absent: 0, incomplete: 0 }
         )
-        setWeekStats(stats)
+        setMonthStats(stats)
       } else {
-        setWeekRows([])
-        setWeekStats({ present: 0, late: 0, absent: 0, incomplete: 0 })
+        setMonthRows([])
+        setMonthStats({ present: 0, late: 0, absent: 0, incomplete: 0 })
       }
     } catch {
       setLoadError("Failed to load dashboard")
@@ -258,7 +261,7 @@ export const DashboardPageContent = () => {
   }
 
   const firstName = me?.fullName?.split(" ")[0] ?? "there"
-  const pendingCorrections = weekRows.filter(
+  const pendingCorrections = monthRows.filter(
     (r) => r.correctionStatus === "pending"
   ).length
 
@@ -333,31 +336,31 @@ export const DashboardPageContent = () => {
           )}
         </PageSection>
 
-        {/* Week summary stats */}
-        <PageSection title="This week">
+        {/* Month summary stats */}
+        <PageSection title="This month">
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <StatCard
               icon={CheckCircle2}
               label="Present"
-              value={weekStats.present}
+              value={monthStats.present}
               colorClass="bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
             />
             <StatCard
               icon={AlertCircle}
               label="Late"
-              value={weekStats.late}
+              value={monthStats.late}
               colorClass="bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
             />
             <StatCard
               icon={XCircle}
               label="Absent"
-              value={weekStats.absent}
+              value={monthStats.absent}
               colorClass="bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-400"
             />
             <StatCard
               icon={Clock}
               label="Incomplete"
-              value={weekStats.incomplete}
+              value={monthStats.incomplete}
               colorClass="bg-orange-50 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400"
             />
           </div>
@@ -378,9 +381,9 @@ export const DashboardPageContent = () => {
 
         {/* Recent attendance */}
         <PageSection title="Recent attendance">
-          {weekRows.length === 0 ? (
+          {monthRows.length === 0 ? (
             <p className="py-6 text-center text-sm text-zinc-500 dark:text-zinc-400">
-              No attendance records this week yet
+              No attendance records this month yet
             </p>
           ) : (
             <div className="overflow-x-auto">
@@ -405,7 +408,7 @@ export const DashboardPageContent = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {weekRows.slice(0, 5).map((row) => {
+                  {monthRows.slice(0, 5).map((row) => {
                     const displayStatus = computeDisplayStatus(row, schedules)
                     const statusClass =
                       displayStatus === "pending"
@@ -448,7 +451,7 @@ export const DashboardPageContent = () => {
               </table>
             </div>
           )}
-          {weekRows.length > 0 && (
+          {monthRows.length > 0 && (
             <Link
               href="/user/attendance"
               className="mt-4 inline-flex items-center gap-1 text-sm font-medium text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
