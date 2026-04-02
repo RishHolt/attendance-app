@@ -150,6 +150,7 @@ export const AttendancePageContent = () => {
     present: 0,
     late: 0,
     absent: 0,
+    incomplete: 0,
   })
   const [attendancePage, setAttendancePage] = useState(1)
   const [todaySchedule, setTodaySchedule] = useState<ScheduleForDay | null>(null)
@@ -272,16 +273,17 @@ export const AttendancePageContent = () => {
             if (displayStatus === "pending") return acc
             if (displayStatus === "present") acc.present += 1
             else if (displayStatus === "late") acc.late += 1
+            else if (displayStatus === "incomplete") acc.incomplete += 1
             else acc.absent += 1
             return acc
           },
-          { present: 0, late: 0, absent: 0 }
+          { present: 0, late: 0, absent: 0, incomplete: 0 }
         )
         setAttendanceStats(statsFromList)
       } else {
         setAttendanceList([])
         setAttendanceTotal(0)
-        setAttendanceStats({ present: 0, late: 0, absent: 0 })
+        setAttendanceStats({ present: 0, late: 0, absent: 0, incomplete: 0 })
       }
     } catch {
       setLoadError("Failed to load attendance")
@@ -318,10 +320,11 @@ export const AttendancePageContent = () => {
           if (displayStatus === "pending") return acc
           if (displayStatus === "present") acc.present += 1
           else if (displayStatus === "late") acc.late += 1
+          else if (displayStatus === "incomplete") acc.incomplete += 1
           else acc.absent += 1
           return acc
         },
-        { present: 0, late: 0, absent: 0 }
+        { present: 0, late: 0, absent: 0, incomplete: 0 }
       ),
     [filteredList, schedules]
   )
@@ -448,15 +451,14 @@ export const AttendancePageContent = () => {
               <div className="flex min-w-0 flex-1">
                 <div className="flex gap-4 sm:gap-6">
                   <div
-                    className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl sm:h-16 sm:w-16 ${
-                      isDenied
+                    className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl sm:h-16 sm:w-16 ${isDenied
                         ? "bg-red-100 dark:bg-red-900/40"
                         : hasTimeOut
                           ? "bg-emerald-100 dark:bg-emerald-900/40"
                           : hasTimeIn
                             ? "bg-amber-100 dark:bg-amber-900/40"
                             : "bg-zinc-100 dark:bg-zinc-800"
-                    }`}
+                      }`}
                   >
                     {isDenied ? (
                       <Clock className="h-7 w-7 text-red-600 dark:text-red-400 sm:h-8 sm:w-8" />
@@ -629,7 +631,7 @@ export const AttendancePageContent = () => {
                 <option value="pending">Pending</option>
               </select>
             </div>
-            <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
+            <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-5 sm:gap-4">
               <div className="rounded-xl border border-zinc-200 bg-zinc-50/80 p-3 dark:border-zinc-700 dark:bg-zinc-800/50">
                 <p className="text-xs font-medium uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
                   Total
@@ -652,6 +654,14 @@ export const AttendancePageContent = () => {
                 </p>
                 <p className="mt-1 text-xl font-semibold text-amber-700 dark:text-amber-300">
                   {filteredStats.late}
+                </p>
+              </div>
+              <div className="rounded-xl border border-orange-200 bg-orange-50/80 p-3 dark:border-orange-900/50 dark:bg-orange-950/30">
+                <p className="text-xs font-medium uppercase tracking-wider text-orange-600 dark:text-orange-400">
+                  Incomplete
+                </p>
+                <p className="mt-1 text-xl font-semibold text-orange-700 dark:text-orange-300">
+                  {filteredStats.incomplete}
                 </p>
               </div>
               <div className="rounded-xl border border-zinc-200 bg-zinc-50/80 p-3 dark:border-zinc-700 dark:bg-zinc-800/50">
@@ -732,8 +742,7 @@ export const AttendancePageContent = () => {
                         </td>
                         <td className="py-3 pr-4">
                           <span
-                            className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium capitalize ${
-                              displayStatus === "pending"
+                            className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium capitalize ${displayStatus === "pending"
                                 ? "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400"
                                 : displayStatus === "present"
                                   ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400"
@@ -742,7 +751,7 @@ export const AttendancePageContent = () => {
                                     : displayStatus === "incomplete"
                                       ? "bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-400"
                                       : "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400"
-                            }`}
+                              }`}
                           >
                             {displayStatus}
                           </span>
@@ -752,13 +761,12 @@ export const AttendancePageContent = () => {
                             <span className="text-sm text-zinc-500 dark:text-zinc-400">—</span>
                           ) : (
                             <span
-                              className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium capitalize ${
-                                row.approvalStatus === "approved"
+                              className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium capitalize ${row.approvalStatus === "approved"
                                   ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400"
                                   : row.approvalStatus === "denied"
                                     ? "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400"
                                     : "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400"
-                              }`}
+                                }`}
                             >
                               {row.approvalStatus ?? "pending"}
                             </span>
@@ -839,8 +847,7 @@ export const AttendancePageContent = () => {
                       </p>
                       <div className="flex flex-wrap gap-1.5 shrink-0">
                         <span
-                          className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium capitalize ${
-                            displayStatus === "pending"
+                          className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium capitalize ${displayStatus === "pending"
                               ? "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400"
                               : displayStatus === "present"
                                 ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400"
@@ -849,7 +856,7 @@ export const AttendancePageContent = () => {
                                   : displayStatus === "incomplete"
                                     ? "bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-400"
                                     : "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400"
-                          }`}
+                            }`}
                         >
                           {displayStatus}
                         </span>
@@ -857,13 +864,12 @@ export const AttendancePageContent = () => {
                           <span className="text-sm text-zinc-500 dark:text-zinc-400">—</span>
                         ) : (
                           <span
-                            className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium capitalize ${
-                              row.approvalStatus === "approved"
+                            className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium capitalize ${row.approvalStatus === "approved"
                                 ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400"
                                 : row.approvalStatus === "denied"
                                   ? "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400"
                                   : "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400"
-                            }`}
+                              }`}
                           >
                             {row.approvalStatus ?? "pending"}
                           </span>
