@@ -160,6 +160,8 @@ export const CalendarPageContent = () => {
   const [userDropdownOpen, setUserDropdownOpen] = useState(false)
   const [hoursRangeFrom, setHoursRangeFrom] = useState("")
   const [hoursRangeTo, setHoursRangeTo] = useState("")
+  const [draftFrom, setDraftFrom] = useState("")
+  const [draftTo, setDraftTo] = useState("")
   const [hoursFilterOpen, setHoursFilterOpen] = useState(false)
   const hoursFilterWrapRef = useRef<HTMLDivElement>(null)
 
@@ -169,15 +171,26 @@ export const CalendarPageContent = () => {
     const first = new Date(y, m, 1)
     const last = new Date(y, m + 1, 0)
     const now = new Date()
-    setHoursRangeFrom(toDateStr(first))
     const isViewingCurrentMonth =
       now.getFullYear() === y && now.getMonth() === m
-    setHoursRangeTo(isViewingCurrentMonth ? toDateStr(now) : toDateStr(last))
+    const defaultFrom = toDateStr(first)
+    const defaultTo = isViewingCurrentMonth ? toDateStr(now) : toDateStr(last)
+    setHoursRangeFrom(defaultFrom)
+    setHoursRangeTo(defaultTo)
+    setDraftFrom(defaultFrom)
+    setDraftTo(defaultTo)
   }, [currentDate])
 
   useEffect(() => {
     applyDefaultHoursRange()
   }, [applyDefaultHoursRange])
+
+  useEffect(() => {
+    if (hoursFilterOpen) {
+      setDraftFrom(hoursRangeFrom)
+      setDraftTo(hoursRangeTo)
+    }
+  }, [hoursFilterOpen, hoursRangeFrom, hoursRangeTo])
 
   useEffect(() => {
     if (!hoursFilterOpen) return
@@ -423,18 +436,18 @@ export const CalendarPageContent = () => {
 
   const todayIso = toDateStr(new Date())
 
-  const handleHoursRangeFromChange = (e: ChangeEvent<HTMLInputElement>) => {
+  const handleDraftFromChange = (e: ChangeEvent<HTMLInputElement>) => {
     const v = e.target.value
     if (!v) return
-    setHoursRangeFrom(v)
-    setHoursRangeTo((prev) => (prev && prev < v ? v : prev))
+    setDraftFrom(v)
+    if (draftTo && draftTo < v) setDraftTo(v)
   }
 
-  const handleHoursRangeToChange = (e: ChangeEvent<HTMLInputElement>) => {
+  const handleDraftToChange = (e: ChangeEvent<HTMLInputElement>) => {
     const v = e.target.value
     if (!v) return
-    setHoursRangeTo(v)
-    setHoursRangeFrom((prev) => (prev && prev > v ? v : prev))
+    setDraftTo(v)
+    if (draftFrom && draftFrom > v) setDraftFrom(v)
   }
 
   const totalRegularMinutes = useMemo(() => {
@@ -565,9 +578,9 @@ export const CalendarPageContent = () => {
                     <input
                       id="calendar-hours-from"
                       type="date"
-                      value={hoursRangeFrom}
-                      max={hoursRangeTo || todayIso}
-                      onChange={handleHoursRangeFromChange}
+                      value={draftFrom}
+                      max={draftTo || todayIso}
+                      onChange={handleDraftFromChange}
                       disabled={!selectedUserId || isLoadingSchedules}
                       className="h-12 min-h-[48px] w-full rounded-xl border border-zinc-200/80 bg-white px-3 text-base font-medium text-zinc-900 transition-colors focus:border-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-400/20 disabled:opacity-50 dark:border-zinc-700/80 dark:bg-zinc-800/50 dark:text-zinc-100 dark:focus:border-zinc-500"
                     />
@@ -582,24 +595,40 @@ export const CalendarPageContent = () => {
                     <input
                       id="calendar-hours-to"
                       type="date"
-                      value={hoursRangeTo}
-                      min={hoursRangeFrom || undefined}
+                      value={draftTo}
+                      min={draftFrom || undefined}
                       max={todayIso}
-                      onChange={handleHoursRangeToChange}
+                      onChange={handleDraftToChange}
                       disabled={!selectedUserId || isLoadingSchedules}
                       className="h-12 min-h-[48px] w-full rounded-xl border border-zinc-200/80 bg-white px-3 text-base font-medium text-zinc-900 transition-colors focus:border-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-400/20 disabled:opacity-50 dark:border-zinc-700/80 dark:bg-zinc-800/50 dark:text-zinc-100 dark:focus:border-zinc-500"
                     />
                   </div>
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    size="default"
-                    onClick={applyDefaultHoursRange}
-                    disabled={!selectedUserId || isLoadingSchedules}
-                    className="w-full"
-                  >
-                    Reset range
-                  </Button>
+                  <div className="grid grid-cols-2 gap-3">
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="default"
+                      onClick={applyDefaultHoursRange}
+                      disabled={!selectedUserId || isLoadingSchedules}
+                      className="w-full"
+                    >
+                      Reset
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="default"
+                      size="default"
+                      onClick={() => {
+                        setHoursRangeFrom(draftFrom)
+                        setHoursRangeTo(draftTo)
+                        setHoursFilterOpen(false)
+                      }}
+                      disabled={!selectedUserId || isLoadingSchedules}
+                      className="w-full"
+                    >
+                      Apply
+                    </Button>
+                  </div>
                 </div>
               </div>
             )}
