@@ -44,3 +44,5 @@ next-env.d.ts
 /dist/
 electron/main.js
 electron/preload.js
+
+/docs

@@ -22,6 +22,7 @@ import { PageHeader } from "@/components/admin/page-header"
 import { DenyAttendanceModal } from "./attendance/deny-attendance-modal"
 import { QrAttendanceModal } from "./attendance/qr-attendance-modal"
 import { formatTime12 } from "@/lib/format-time"
+import { getWeekDateRange } from "@/lib/date-utils"
 import { swal } from "@/lib/swal"
 import type { AdminAttendanceRow } from "@/types"
 
@@ -29,10 +30,12 @@ type Overview = {
   todayPresent: number
   todayLate: number
   todayAbsent: number
+  todayIncomplete: number
   activeUsers: number
   totalPresent: number
   totalLate: number
   totalAbsent: number
+  totalIncomplete: number
   totalRecords: number
   from: string
   to: string
@@ -105,10 +108,14 @@ export const DashboardPageContent = () => {
   const loadData = useCallback(async () => {
     setIsLoading(true)
     const today = getTodayISO()
+    const { from: weekFrom, to: weekTo } = getWeekDateRange()
+
+    // Auto-mark absent for today before loading analytics
+    await fetch(`/api/attendances/mark-absent?date=${today}`, { method: "POST" }).catch(() => {})
 
     try {
       const [analyticsRes, pendingRes, todayRes, summariesRes, usersRes] = await Promise.all([
-        fetch("/api/analytics"),
+        fetch(`/api/analytics?from=${weekFrom}&to=${weekTo}`),
         fetch(`/api/attendances?approval_status=pending&page=1&limit=5`),
         fetch(`/api/attendances?from=${today}&to=${today}&limit=20`),
         fetch("/api/schedules/summaries"),
@@ -255,7 +262,7 @@ export const DashboardPageContent = () => {
       />
 
       {/* Summary stats */}
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7">
         <div className="flex items-center gap-4 rounded-xl border border-zinc-200/80 bg-white p-4 dark:border-zinc-700/50 dark:bg-zinc-900/90">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-amber-500">
             <Clock className="h-5 w-5 text-white" aria-hidden />
@@ -272,9 +279,9 @@ export const DashboardPageContent = () => {
             <CheckCircle2 className="h-5 w-5 text-white" aria-hidden />
           </div>
           <div className="min-w-0">
-            <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400">Today present</p>
+            <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400">This week present</p>
             <p className="text-xl font-semibold tabular-nums text-zinc-900 dark:text-zinc-100">
-              {isLoading ? "—" : overview?.todayPresent ?? 0}
+              {isLoading ? "—" : overview?.totalPresent ?? 0}
             </p>
           </div>
         </div>
@@ -283,9 +290,9 @@ export const DashboardPageContent = () => {
             <Clock className="h-5 w-5 text-white" aria-hidden />
           </div>
           <div className="min-w-0">
-            <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400">Today late</p>
+            <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400">This week late</p>
             <p className="text-xl font-semibold tabular-nums text-zinc-900 dark:text-zinc-100">
-              {isLoading ? "—" : overview?.todayLate ?? 0}
+              {isLoading ? "—" : overview?.totalLate ?? 0}
             </p>
           </div>
         </div>
@@ -294,9 +301,20 @@ export const DashboardPageContent = () => {
             <AlertCircle className="h-5 w-5 text-white" aria-hidden />
           </div>
           <div className="min-w-0">
-            <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400">Today absent</p>
+            <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400">This week absent</p>
             <p className="text-xl font-semibold tabular-nums text-zinc-900 dark:text-zinc-100">
-              {isLoading ? "—" : overview?.todayAbsent ?? 0}
+              {isLoading ? "—" : overview?.totalAbsent ?? 0}
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-4 rounded-xl border border-zinc-200/80 bg-white p-4 dark:border-zinc-700/50 dark:bg-zinc-900/90">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-purple-500">
+            <CalendarRange className="h-5 w-5 text-white" aria-hidden />
+          </div>
+          <div className="min-w-0">
+            <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400">Incomplete today</p>
+            <p className="text-xl font-semibold tabular-nums text-zinc-900 dark:text-zinc-100">
+              {isLoading ? "—" : overview?.todayIncomplete ?? 0}
             </p>
           </div>
         </div>

@@ -40,9 +40,11 @@ export async function GET(request: Request) {
       totalPresent: rows.filter((r) => r.status === "present").length,
       totalLate: rows.filter((r) => r.status === "late").length,
       totalAbsent: rows.filter((r) => r.status === "absent").length,
+      totalIncomplete: rows.filter((r) => r.status === "incomplete").length,
       todayPresent: todayRows.filter((r) => r.status === "present").length,
       todayLate: todayRows.filter((r) => r.status === "late").length,
       todayAbsent: todayRows.filter((r) => r.status === "absent").length,
+      todayIncomplete: todayRows.filter((r) => r.status === "incomplete").length,
       totalRecords: rows.length,
       activeUsers: activeUsersCount ?? 0,
       from,
@@ -64,21 +66,23 @@ export async function GET(request: Request) {
       (usersData ?? []).map((u) => [u.id, { user_id: u.user_id, full_name: u.full_name }])
     )
 
-    const byDate = new Map<string, { present: number; late: number; absent: number }>()
+    const byDate = new Map<string, { present: number; late: number; absent: number; incomplete: number }>()
     const byDateUsers = new Map<
       string,
       {
         present: { fullName: string; userDisplayId: string }[]
         late: { fullName: string; userDisplayId: string }[]
         absent: { fullName: string; userDisplayId: string }[]
+        incomplete: { fullName: string; userDisplayId: string }[]
       }
     >()
     for (const r of rows) {
       const d = r.attendance_date
-      const curr = byDate.get(d) ?? { present: 0, late: 0, absent: 0 }
+      const curr = byDate.get(d) ?? { present: 0, late: 0, absent: 0, incomplete: 0 }
       if (r.status === "present") curr.present++
       else if (r.status === "late") curr.late++
-      else curr.absent++
+      else if (r.status === "absent") curr.absent++
+      else if (r.status === "incomplete") curr.incomplete++
       byDate.set(d, curr)
 
       const u = userMap.get(r.user_id)
@@ -87,10 +91,12 @@ export async function GET(request: Request) {
         present: [],
         late: [],
         absent: [],
+        incomplete: [],
       }
       if (r.status === "present") dayUsers.present.push(userEntry)
       else if (r.status === "late") dayUsers.late.push(userEntry)
-      else dayUsers.absent.push(userEntry)
+      else if (r.status === "absent") dayUsers.absent.push(userEntry)
+      else if (r.status === "incomplete") dayUsers.incomplete.push(userEntry)
       byDateUsers.set(d, dayUsers)
     }
     const dailyTrend = Array.from(byDate.entries())
@@ -107,6 +113,7 @@ export async function GET(request: Request) {
         present: number
         late: number
         absent: number
+        incomplete: number
         fullName: string
         userDisplayId: string
       }
@@ -119,12 +126,14 @@ export async function GET(request: Request) {
         present: 0,
         late: 0,
         absent: 0,
+        incomplete: 0,
         fullName: u?.full_name ?? "Unknown",
         userDisplayId: u?.user_id ?? "",
       }
       if (r.status === "present") curr.present++
       else if (r.status === "late") curr.late++
-      else curr.absent++
+      else if (r.status === "absent") curr.absent++
+      else if (r.status === "incomplete") curr.incomplete++
       byUser.set(key, curr)
     }
     const perUser = Array.from(byUser.values()).sort(

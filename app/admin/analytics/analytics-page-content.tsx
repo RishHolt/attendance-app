@@ -44,6 +44,7 @@ type AnalyticsData = {
     totalPresent: number
     totalLate: number
     totalAbsent: number
+    totalIncomplete: number
     todayPresent: number
     todayLate: number
     todayAbsent: number
@@ -53,13 +54,14 @@ type AnalyticsData = {
     to: string
   }
   approvalBreakdown: { pending: number; approved: number; denied: number }
-  dailyTrend: { date: string; present: number; late: number; absent: number }[]
+  dailyTrend: { date: string; present: number; late: number; absent: number; incomplete: number }[]
   dailyBreakdown?: DayBreakdown[]
   perUser: {
     userId: string
     present: number
     late: number
     absent: number
+    incomplete: number
     fullName: string
     userDisplayId: string
   }[]
@@ -104,6 +106,7 @@ const CHART_COLORS = {
   present: "#10b981",
   late: "#f59e0b",
   absent: "#ef4444",
+  incomplete: "#3b82f6",
 }
 
 const CustomTooltip = ({
@@ -158,6 +161,10 @@ export const AnalyticsPageContent = () => {
   const loadData = useCallback(async () => {
     setIsLoading(true)
     try {
+      const today = new Date().toISOString().split("T")[0] ?? ""
+      // Auto-mark absent for today before fetching analytics
+      await fetch(`/api/attendances/mark-absent?date=${today}`, { method: "POST" }).catch(() => {})
+
       const fromParam = from.trim() || getDefaultRange().from
       const toParam = to.trim() || getDefaultRange().to
       const res = await fetch(`/api/analytics?from=${fromParam}&to=${toParam}`)
@@ -238,6 +245,7 @@ export const AnalyticsPageContent = () => {
   const totalPresent = overview?.totalPresent ?? 0
   const totalLate = overview?.totalLate ?? 0
   const totalAbsent = overview?.totalAbsent ?? 0
+  const totalIncomplete = overview?.totalIncomplete ?? 0
   const activeUsers = overview?.activeUsers ?? 1
   const attendanceRate = totalRecords > 0 ? Math.round((totalPresent / totalRecords) * 100) : 0
   const lateRate = totalPresent > 0 ? Math.round((totalLate / (totalPresent + totalLate)) * 100) : 0
@@ -247,7 +255,8 @@ export const AnalyticsPageContent = () => {
     Present: d.present,
     Late: d.late,
     Absent: d.absent,
-    total: d.present + d.late + d.absent,
+    Incomplete: d.incomplete ?? 0,
+    total: d.present + d.late + d.absent + (d.incomplete ?? 0),
   }))
 
   const barChartData = dailyTrend.map((d) => ({
@@ -256,6 +265,7 @@ export const AnalyticsPageContent = () => {
     present: d.present,
     late: d.late,
     absent: d.absent,
+    incomplete: d.incomplete ?? 0,
   }))
 
   const pieData = [
@@ -335,7 +345,7 @@ export const AnalyticsPageContent = () => {
       {overview && (
         <>
           {/* KPI cards */}
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-2 lg:grid-cols-5">
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
             <Card variant="default" padding="md">
               <div className="flex items-center gap-3">
                 <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-emerald-500">
@@ -368,6 +378,24 @@ export const AnalyticsPageContent = () => {
                   </p>
                   <p className="text-xs text-zinc-500 dark:text-zinc-400">
                     {totalLate} of {totalPresent + totalLate} present
+                  </p>
+                </div>
+              </div>
+            </Card>
+            <Card variant="default" padding="md">
+              <div className="flex items-center gap-3">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-500">
+                  <AlertCircle className="h-5 w-5 text-white" aria-hidden />
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400">
+                    Incomplete
+                  </p>
+                  <p className="text-2xl font-bold tabular-nums text-zinc-900 dark:text-zinc-100">
+                    {totalIncomplete}
+                  </p>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                    No time-out recorded
                   </p>
                 </div>
               </div>
@@ -732,6 +760,9 @@ export const AnalyticsPageContent = () => {
                       <th className="pb-3 pr-4 font-medium uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
                         Absent
                       </th>
+                      <th className="pb-3 pr-4 font-medium uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+                        Incomplete
+                      </th>
                       <th className="pb-3 font-medium uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
                         Rate
                       </th>
@@ -744,7 +775,7 @@ export const AnalyticsPageContent = () => {
                       const start = (page - 1) * EMPLOYEES_PER_PAGE
                       const paginated = perUser.slice(start, start + EMPLOYEES_PER_PAGE)
                       return paginated.map((u) => {
-                      const total = u.present + u.late + u.absent
+                      const total = u.present + u.late + u.absent + (u.incomplete ?? 0)
                       const rate = total > 0 ? Math.round((u.present / total) * 100) : 0
                       return (
                         <tr
@@ -769,6 +800,9 @@ export const AnalyticsPageContent = () => {
                           </td>
                           <td className="py-3 pr-4 text-red-600 dark:text-red-400">
                             {u.absent}
+                          </td>
+                          <td className="py-3 pr-4 text-blue-600 dark:text-blue-400">
+                            {u.incomplete ?? 0}
                           </td>
                           <td className="py-3 font-medium tabular-nums text-zinc-900 dark:text-zinc-100">
                             {rate}%
