@@ -162,11 +162,24 @@ export const AnalyticsPageContent = () => {
     setIsLoading(true)
     try {
       const today = new Date().toISOString().split("T")[0] ?? ""
-      // Auto-mark absent for today before fetching analytics
-      await fetch(`/api/attendances/mark-absent?date=${today}`, { method: "POST" }).catch(() => {})
-
       const fromParam = from.trim() || getDefaultRange().from
       const toParam = to.trim() || getDefaultRange().to
+
+      // Auto-mark absent for all past dates in the selected range (backfill + today)
+      const markAbsentDates: string[] = []
+      const cursor = new Date(fromParam + "T12:00:00")
+      const todayDate = new Date(today + "T12:00:00")
+      const rangeEnd = new Date(toParam + "T12:00:00")
+      const endDate = rangeEnd < todayDate ? rangeEnd : todayDate
+      while (cursor <= endDate) {
+        markAbsentDates.push(cursor.toISOString().split("T")[0]!)
+        cursor.setDate(cursor.getDate() + 1)
+      }
+      await Promise.all(
+        markAbsentDates.map((d) =>
+          fetch(`/api/attendances/mark-absent?date=${d}`, { method: "POST" }).catch(() => {})
+        )
+      )
       const res = await fetch(`/api/analytics?from=${fromParam}&to=${toParam}`)
       if (!res.ok) throw new Error("Failed to fetch")
       const json = await res.json()

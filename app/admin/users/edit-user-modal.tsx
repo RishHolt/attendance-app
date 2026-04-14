@@ -28,6 +28,7 @@ type UserRow = {
   position: string | null
   status: "active" | "inactive"
   startDate: string | null
+  role: "employee" | "admin" | "ojt"
 }
 
 type EditUserModalProps = {
@@ -47,6 +48,7 @@ export const EditUserModal = ({
   const [email, setEmail] = useState("")
   const [contactNo, setContactNo] = useState("")
   const [position, setPosition] = useState("")
+  const [role, setRole] = useState<"employee" | "admin" | "ojt">("employee")
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -64,6 +66,7 @@ export const EditUserModal = ({
       setEmail(user.email)
       setContactNo(user.contactNo ?? "")
       setPosition(user.position ?? "")
+      setRole(user.role ?? "employee")
       setPassword("")
       setConfirmPassword("")
       setFieldErrors({})
@@ -199,6 +202,7 @@ export const EditUserModal = ({
     email !== user.email ||
     contactNo !== (user.contactNo ?? "") ||
     position !== (user.position ?? "") ||
+    role !== (user.role ?? "employee") ||
     (password.trim().length > 0 && password === confirmPassword)
 
   const handleClose = () => {
@@ -236,6 +240,7 @@ export const EditUserModal = ({
           email,
           contactNo,
           position,
+          role,
           ...(password.trim() ? { password: password.trim() } : {}),
         }),
       })
@@ -331,18 +336,35 @@ export const EditUserModal = ({
           onBlur={(e) => validateField("contactNo", e.target.value)}
           error={getFieldError("contactNo")}
         />
-        <Input
-          label="Position"
-          placeholder="e.g. Developer, Manager"
-          value={position}
-          onChange={(e) => {
-            setPosition(e.target.value)
-            validateField("position", e.target.value)
-          }}
-          onBlur={(e) => validateField("position", e.target.value)}
-          required
-          error={getFieldError("position")}
-        />
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+          <Input
+            label="Position"
+            placeholder="e.g. Developer, Manager"
+            value={position}
+            onChange={(e) => {
+              setPosition(e.target.value)
+              validateField("position", e.target.value)
+            }}
+            onBlur={(e) => validateField("position", e.target.value)}
+            required
+            error={getFieldError("position")}
+          />
+          <div className="flex flex-col gap-2">
+            <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300" htmlFor="edit-user-role">
+              Role
+            </label>
+            <select
+              id="edit-user-role"
+              value={role}
+              onChange={(e) => setRole(e.target.value as "employee" | "admin" | "ojt")}
+              className="min-h-[44px] w-full rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-base text-zinc-900 transition-all duration-200 hover:border-zinc-300 focus:border-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-200 focus:ring-offset-0 dark:border-zinc-700 dark:bg-zinc-900/50 dark:text-zinc-100 dark:hover:border-zinc-600 dark:focus:border-zinc-500 dark:focus:ring-zinc-800"
+            >
+              <option value="employee">Employee</option>
+              <option value="ojt">OJT / Intern</option>
+              <option value="admin">Admin</option>
+            </select>
+          </div>
+        </div>
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
           <PasswordInput
             label="Password"

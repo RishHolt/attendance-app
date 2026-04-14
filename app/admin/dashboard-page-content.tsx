@@ -110,8 +110,19 @@ export const DashboardPageContent = () => {
     const today = getTodayISO()
     const { from: weekFrom, to: weekTo } = getWeekDateRange()
 
-    // Auto-mark absent for today before loading analytics
-    await fetch(`/api/attendances/mark-absent?date=${today}`, { method: "POST" }).catch(() => {})
+    // Auto-mark absent for all past dates in the current week range (backfill + today)
+    const markAbsentDates: string[] = []
+    const cursor = new Date(weekFrom + "T12:00:00")
+    const todayDate = new Date(today + "T12:00:00")
+    while (cursor <= todayDate) {
+      markAbsentDates.push(cursor.toISOString().split("T")[0]!)
+      cursor.setDate(cursor.getDate() + 1)
+    }
+    await Promise.all(
+      markAbsentDates.map((d) =>
+        fetch(`/api/attendances/mark-absent?date=${d}`, { method: "POST" }).catch(() => {})
+      )
+    )
 
     try {
       const [analyticsRes, pendingRes, todayRes, summariesRes, usersRes] = await Promise.all([

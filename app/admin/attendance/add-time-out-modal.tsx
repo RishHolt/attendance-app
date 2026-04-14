@@ -23,10 +23,7 @@ export const AddTimeOutModal = ({
 
   useEffect(() => {
     if (open) {
-      const now = new Date()
-      const h = String(now.getHours()).padStart(2, "0")
-      const m = String(now.getMinutes()).padStart(2, "0")
-      setTimeOut(`${h}:${m}`)
+      setTimeOut("")
     }
   }, [open])
 

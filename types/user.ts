@@ -7,4 +7,5 @@ export type UserRow = {
   position: string | null
   status: "active" | "inactive"
   startDate: string | null
+  role: "employee" | "admin" | "ojt"
 }

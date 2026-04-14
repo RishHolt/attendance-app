@@ -25,6 +25,7 @@ export async function PATCH(
       status?: "active" | "inactive"
       password?: string
       startDate?: string | null
+      role?: string
     }
 
     if (body.password !== undefined && body.password?.trim()) {
@@ -64,6 +65,13 @@ export async function PATCH(
     }
     if (body.startDate !== undefined) {
       updates.start_date = body.startDate?.trim() || null
+    }
+    if (body.role !== undefined) {
+      const validRoles = ["employee", "admin", "ojt"]
+      if (!validRoles.includes(body.role)) {
+        return NextResponse.json({ error: "Invalid role" }, { status: 400 })
+      }
+      updates.role = body.role
     }
 
     if (Object.keys(updates).length === 0 && !body.password?.trim()) {
@@ -125,6 +133,7 @@ export async function PATCH(
       position: string | null
       status: string
       start_date: string | null
+      role: string
     } | null
 
     if (Object.keys(updates).length > 0) {
@@ -132,7 +141,7 @@ export async function PATCH(
         .from("users")
         .update(updates)
         .eq("id", id)
-        .select("id, user_id, full_name, email, contact_no, position, status, start_date")
+        .select("id, user_id, full_name, email, contact_no, position, status, start_date, role")
         .single()
       if (result.error) {
         if (result.error.code === "23505") {
@@ -150,7 +159,7 @@ export async function PATCH(
     } else {
       const result = await supabase
         .from("users")
-        .select("id, user_id, full_name, email, contact_no, position, status, start_date")
+        .select("id, user_id, full_name, email, contact_no, position, status, start_date, role")
         .eq("id", id)
         .single()
       if (result.error) {
@@ -175,6 +184,7 @@ export async function PATCH(
       position: data.position,
       status: data.status as "active" | "inactive",
       startDate: data.start_date ?? null,
+      role: (data.role ?? "employee") as "employee" | "admin" | "ojt",
     }
 
     return NextResponse.json(user)

@@ -39,6 +39,13 @@ type UserRow = {
   position: string | null
   status: "active" | "inactive"
   startDate: string | null
+  role: "employee" | "admin" | "ojt"
+}
+
+const roleBadge: Record<string, { label: string; className: string }> = {
+  ojt: { label: "OJT", className: "bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-400" },
+  admin: { label: "Admin", className: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-400" },
+  employee: { label: "Employee", className: "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400" },
 }
 
 const fetchUsers = async (): Promise<{ users: UserRow[]; error?: string }> => {
@@ -363,9 +370,14 @@ export const UsersPageContent = () => {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <span className="text-zinc-900 dark:text-zinc-100">
-                          {user.position || "—"}
-                        </span>
+                        <div className="flex flex-col gap-1">
+                          <span className="text-zinc-900 dark:text-zinc-100">
+                            {user.position || "—"}
+                          </span>
+                          <span className={`inline-flex w-fit rounded-full px-2.5 py-0.5 text-xs font-medium ${(roleBadge[user.role] ?? roleBadge.employee).className}`}>
+                            {(roleBadge[user.role] ?? roleBadge.employee).label}
+                          </span>
+                        </div>
                       </TableCell>
                       <TableCell>
                         <span
@@ -424,7 +436,10 @@ export const UsersPageContent = () => {
                               {user.position}
                             </p>
                           )}
-                          <div className="mt-2 flex flex-wrap gap-2">
+                          <span className={`mt-1 inline-flex w-fit rounded-full px-2 py-0.5 text-xs font-medium ${(roleBadge[user.role] ?? roleBadge.employee).className}`}>
+                            {(roleBadge[user.role] ?? roleBadge.employee).label}
+                          </span>
+                          <div className="mt-1 flex flex-wrap gap-2">
                             <span
                               className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
                                 user.status === "active"

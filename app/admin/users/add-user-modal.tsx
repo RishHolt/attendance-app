@@ -29,6 +29,7 @@ export const AddUserModal = ({ open, onClose, onSuccess }: AddUserModalProps) =>
   const [email, setEmail] = useState("")
   const [contactNo, setContactNo] = useState("")
   const [position, setPosition] = useState("")
+  const [role, setRole] = useState<"employee" | "admin" | "ojt">("employee")
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -45,6 +46,7 @@ export const AddUserModal = ({ open, onClose, onSuccess }: AddUserModalProps) =>
     setEmail("")
     setContactNo("")
     setPosition("")
+    setRole("employee")
     setPassword("")
     setConfirmPassword("")
     setFieldErrors({})
@@ -188,6 +190,7 @@ export const AddUserModal = ({ open, onClose, onSuccess }: AddUserModalProps) =>
           email,
           contactNo,
           position,
+          role,
           password,
         }),
       })
@@ -299,6 +302,21 @@ export const AddUserModal = ({ open, onClose, onSuccess }: AddUserModalProps) =>
           required
           error={getFieldError("position")}
         />
+        <div className="flex flex-col gap-2">
+          <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300" htmlFor="add-user-role">
+            Role
+          </label>
+          <select
+            id="add-user-role"
+            value={role}
+            onChange={(e) => setRole(e.target.value as "employee" | "admin" | "ojt")}
+            className="min-h-[44px] w-full rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-base text-zinc-900 transition-all duration-200 hover:border-zinc-300 focus:border-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-200 focus:ring-offset-0 dark:border-zinc-700 dark:bg-zinc-900/50 dark:text-zinc-100 dark:hover:border-zinc-600 dark:focus:border-zinc-500 dark:focus:ring-zinc-800"
+          >
+            <option value="employee">Employee</option>
+            <option value="ojt">OJT / Intern</option>
+            <option value="admin">Admin</option>
+          </select>
+        </div>
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
           <PasswordInput
             label="Password"

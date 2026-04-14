@@ -18,7 +18,7 @@ export async function GET() {
 
     const withStartDate = await supabase
       .from("users")
-      .select("id, user_id, full_name, email, contact_no, position, status, start_date")
+      .select("id, user_id, full_name, email, contact_no, position, status, start_date, role")
       .order("created_at", { ascending: false })
 
     const msg = String(withStartDate.error?.message ?? "").toLowerCase()
@@ -27,7 +27,7 @@ export async function GET() {
     const result = useFallback
       ? await supabase
           .from("users")
-          .select("id, user_id, full_name, email, contact_no, position, status")
+          .select("id, user_id, full_name, email, contact_no, position, status, role")
           .order("created_at", { ascending: false })
       : withStartDate
 
@@ -45,6 +45,7 @@ export async function GET() {
       position: row.position as string | null,
       status: row.status as "active" | "inactive",
       startDate: (row.start_date as string | null) ?? null,
+      role: ((row.role as string | null) ?? "employee") as "employee" | "admin" | "ojt",
     }))
 
     return NextResponse.json(users)
@@ -63,12 +64,13 @@ export async function POST(request: Request) {
     if (unauthorized) return unauthorized
 
     const body = await request.json()
-    const { fullName, email, contactNo, position, password } = body as {
+    const { fullName, email, contactNo, position, password, role } = body as {
       fullName?: string
       email?: string
       contactNo?: string
       position?: string
       password?: string
+      role?: string
     }
 
     if (!fullName?.trim() || !email?.trim()) {
@@ -110,6 +112,9 @@ export async function POST(request: Request) {
         )
       }
     }
+
+    const validRoles = ["employee", "admin", "ojt"]
+    const resolvedRole = role && validRoles.includes(role) ? role : "employee"
 
     let authUserId: string | null = null
     let passwordHash: string | null = null
@@ -156,13 +161,14 @@ export async function POST(request: Request) {
         contact_no: contactNoTrimmed,
         position: position.trim(),
         status: "active",
+        role: resolvedRole,
         ...(passwordHash ? { password_hash: passwordHash } : {}),
       }
       const clientToUse = authUserId ? admin : supabase
       const { data, error } = await clientToUse
         .from("users")
         .insert(insertPayload)
-        .select("id, user_id, full_name, email, contact_no, position, status")
+        .select("id, user_id, full_name, email, contact_no, position, status, role")
         .single()
 
       if (!error) {
@@ -175,6 +181,7 @@ export async function POST(request: Request) {
           position: data.position,
           status: data.status as "active" | "inactive",
           startDate: null,
+          role: (data.role ?? "employee") as "employee" | "admin" | "ojt",
         }
         return NextResponse.json(user, { status: 201 })
       }

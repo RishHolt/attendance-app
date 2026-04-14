@@ -5,10 +5,20 @@ type SupabaseClient = Awaited<ReturnType<typeof import("@/lib/supabase/server").
 export async function getAdminUser(supabase: SupabaseClient) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user?.email) return null
+
+  // .env admin always passes
   const adminEmail = process.env.LOCAL_ADMIN_EMAIL?.trim()
-  if (!adminEmail) return null
-  if (user.email.toLowerCase() !== adminEmail.toLowerCase()) return null
-  return user
+  if (adminEmail && user.email.toLowerCase() === adminEmail.toLowerCase()) return user
+
+  // DB-level admin role
+  const { data } = await supabase
+    .from("users")
+    .select("role")
+    .eq("email", user.email.toLowerCase())
+    .single()
+  if (data?.role === "admin") return user
+
+  return null
 }
 
 export async function requireAdmin(

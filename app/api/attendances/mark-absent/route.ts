@@ -60,10 +60,13 @@ export async function POST(request: Request) {
 
     // For today: only mark absent after the user's scheduled time_out has passed.
     // For past dates: no time restriction (null).
+    // Schedule times are stored in Philippine time (UTC+8), so offset now accordingly.
     const now = new Date()
+    const PH_OFFSET_MS = 8 * 60 * 60 * 1000
+    const nowPH = new Date(now.getTime() + PH_OFFSET_MS)
     const nowTime =
       targetDate === todayISO
-        ? `${String(now.getUTCHours()).padStart(2, "0")}:${String(now.getUTCMinutes()).padStart(2, "0")}`
+        ? `${String(nowPH.getUTCHours()).padStart(2, "0")}:${String(nowPH.getUTCMinutes()).padStart(2, "0")}`
         : null
 
     const absentIds = resolveAbsentUserIds(
