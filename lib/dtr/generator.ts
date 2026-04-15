@@ -15,6 +15,10 @@ const W = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'
 
 /** Half-points: 20 = 10pt — most filled DTR cells (Word `w:sz` uses half-points) */
 const SZ_BODY = '18'
+/** Name/title block replacing "In Charge" in the DTR footer */
+const IN_CHARGE_NAME = 'MARIE JEANNE CARMELLI R. DESIDERIO'
+const IN_CHARGE_TITLE = 'Administrative Officer IV/HRMO II'
+const SZ_IN_CHARGE = '16'
 /** Half-points for the employee name (underlined, centered). */
 const SZ_NAME = '20'
 /** Half-points for the “Regular days” value (e.g. Monday - Friday). Change this to resize only that line. */
@@ -442,6 +446,75 @@ const fixOuterTableSingleColumn = (body: Element, contentWidthTwips: number) => 
   }
 }
 
+/**
+ * Finds every paragraph whose text content is exactly "In Charge" (case-insensitive)
+ * and replaces it with:
+ *   1. Name paragraph (bold, centered)
+ *   2. The underscore line that was originally above "In Charge" (moved between name and title)
+ *   3. Title paragraph (centered)
+ */
+const replaceInChargeParagraphs = (body: Element, doc: Document) => {
+  const allParas = getAll(body, 'p')
+  for (const p of allParas) {
+    const text = getAll(p, 't')
+      .map((t) => t.textContent ?? '')
+      .join('')
+      .trim()
+
+    if (text.toLowerCase() !== 'in charge') continue
+
+    const parent = p.parentNode
+    if (!parent) continue
+
+    // Find the preceding sibling paragraph (the underscores line)
+    let prevSibling: Element | null = null
+    let cur = p.previousSibling
+    while (cur) {
+      if (cur.nodeType === 1 && (cur as Element).localName === 'p') {
+        prevSibling = cur as Element
+        break
+      }
+      cur = cur.previousSibling
+    }
+
+    // Reuse the "In Charge" paragraph as the name paragraph (bold, centered)
+    clearDirectRuns(p)
+    let pPr = getDirectChildren(p, 'pPr')[0]
+    if (!pPr) {
+      pPr = doc.createElementNS(W, 'w:pPr')
+      p.insertBefore(pPr, p.firstChild)
+    }
+    let jc = getDirectChildren(pPr, 'jc')[0]
+    if (!jc) {
+      jc = doc.createElementNS(W, 'w:jc')
+      pPr.appendChild(jc)
+    }
+    jc.setAttributeNS(W, 'w:val', 'center')
+    appendArialTextRun(p, IN_CHARGE_NAME, doc, { szHalf: SZ_IN_CHARGE, bold: true })
+
+    // Build title paragraph (centered, not bold)
+    const titleP = doc.createElementNS(W, 'w:p')
+    const titlePPr = doc.createElementNS(W, 'w:pPr')
+    const titleSpacing = doc.createElementNS(W, 'w:spacing')
+    titleSpacing.setAttributeNS(W, 'w:after', '0')
+    titlePPr.appendChild(titleSpacing)
+    const titleJc = doc.createElementNS(W, 'w:jc')
+    titleJc.setAttributeNS(W, 'w:val', 'center')
+    titlePPr.appendChild(titleJc)
+    titleP.appendChild(titlePPr)
+    appendArialTextRun(titleP, IN_CHARGE_TITLE, doc, { szHalf: SZ_IN_CHARGE, bold: false })
+
+    // Insert title after name paragraph
+    parent.insertBefore(titleP, p.nextSibling)
+
+    // Move the underscore line from above the name to between name and title
+    if (prevSibling) {
+      parent.removeChild(prevSibling)
+      parent.insertBefore(prevSibling, titleP)
+    }
+  }
+}
+
 export type GenerateDTROptions = {
   /** Single filled column (for preview); export uses two copies per form */
   singleColumn?: boolean
@@ -497,6 +570,7 @@ export const generateDTR = async (
   }
 
   removeInstructionPageAfterDtrTable(body)
+  replaceInChargeParagraphs(body, doc)
 
   zip.file('word/document.xml', serializer.serializeToString(doc))
   return Buffer.from(zip.generate({ type: 'arraybuffer' }))

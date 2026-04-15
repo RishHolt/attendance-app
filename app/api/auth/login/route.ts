@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server"
+import bcrypt from "bcryptjs"
 import { createClient } from "@/lib/supabase/server"
+import { createAdminClient } from "@/lib/supabase/admin"
 import { isEmail } from "@/lib/user-form-validation"
 
 const resolveEmailFromLogin = (login: string): string | null => {
@@ -55,24 +57,49 @@ export async function POST(request: Request) {
     }
 
     const supabase = await createClient()
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    })
+    const admin = createAdminClient()
 
-    if (error) {
-      return respondError(error.message, 401)
+    // Try Supabase auth first
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+
+    let userEmail = email
+    let isAdmin = false
+
+    if (error || !data.user) {
+      // Fallback: check password_hash in users table (users without a Supabase auth account)
+      const { data: userRow } = await admin
+        .from("users")
+        .select("id, email, password_hash, role")
+        .ilike("email", email)
+        .maybeSingle()
+
+      if (!userRow?.password_hash) {
+        return respondError("Invalid login credentials", 401)
+      }
+
+      const passwordMatch = await bcrypt.compare(password, userRow.password_hash)
+      if (!passwordMatch) {
+        return respondError("Invalid login credentials", 401)
+      }
+
+      userEmail = userRow.email as string
+      isAdmin = userRow.role === "admin"
+    } else {
+      userEmail = data.user.email ?? email
+      const localAdminEmail = process.env.LOCAL_ADMIN_EMAIL?.trim()
+      isAdmin =
+        isLocalAdminLogin ||
+        !!(localAdminEmail && userEmail.toLowerCase() === localAdminEmail.toLowerCase())
+
+      if (!isAdmin) {
+        const { data: userRecord } = await admin
+          .from("users")
+          .select("role")
+          .ilike("email", userEmail)
+          .single()
+        if (userRecord?.role === "admin") isAdmin = true
+      }
     }
-
-    if (!data.user) {
-      return respondError("Sign in failed")
-    }
-
-    const localAdminEmail = process.env.LOCAL_ADMIN_EMAIL?.trim()
-    const isAdmin =
-      isLocalAdminLogin ||
-      (localAdminEmail &&
-        data.user.email?.toLowerCase() === localAdminEmail.toLowerCase())
 
     const returnTo = formData.get("returnTo")?.toString()?.trim() ?? ""
     const isValidReturnTo =

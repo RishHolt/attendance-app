@@ -20,11 +20,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ marked: 0 })
     }
 
-    // Fetch all active users
+    // Fetch all active non-admin users
     const { data: usersData, error: usersError } = await supabase
       .from("users")
       .select("id")
       .eq("status", "active")
+      .neq("role", "admin")
 
     if (usersError) {
       return NextResponse.json({ error: usersError.message }, { status: 500 })

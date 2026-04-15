@@ -31,7 +31,10 @@
       {
         "from": ".next/standalone",
         "to": "standalone",
-        "filter": ["**/*", "!node_modules"]
+        "filter": [
+          "**/*",
+          "!node_modules"
+        ]
       },
       {
         "from": ".next/standalone/node_modules",
@@ -71,6 +74,7 @@
     "lucide-react": "^0.575.0",
     "motion": "^12.34.3",
     "next": "16.1.6",
+    "nodemailer": "^8.0.5",
     "pdf-lib": "^1.17.1",
     "pizzip": "^3.2.0",
     "qrcode": "^1.5.4",
@@ -83,6 +87,7 @@
     "@tailwindcss/postcss": "^4",
     "@types/bcryptjs": "^2.4.6",
     "@types/node": "^20",
+    "@types/nodemailer": "^8.0.0",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "concurrently": "^9.2.1",

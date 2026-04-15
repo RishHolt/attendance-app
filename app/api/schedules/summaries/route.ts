@@ -47,6 +47,7 @@ export async function GET() {
     const { data: usersData } = await supabase
       .from("users")
       .select("id")
+      .neq("role", "admin")
       .order("created_at", { ascending: false })
 
     const userIds = (usersData ?? []).map((u) => u.id)

@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import { motion } from "motion/react"
 import { Button, Input } from "@/components/ui"
@@ -108,6 +109,7 @@ export const LoginForm = () => {
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.23, duration: 0.4 }}
+        className="flex flex-col gap-1.5"
       >
         <Input
           id="password"
@@ -120,6 +122,14 @@ export const LoginForm = () => {
           value={password}
           onChange={(e) => setPassword(e.target.value)}
         />
+        <div className="text-right">
+          <Link
+            href="/auth/forgot-password"
+            className="text-sm text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200"
+          >
+            Forgot password?
+          </Link>
+        </div>
       </motion.div>
       <motion.div
         initial={{ opacity: 0, y: 16 }}

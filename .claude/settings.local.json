@@ -2,7 +2,11 @@
   "permissions": {
     "allow": [
       "Bash(npm run:*)",
-      "Bash(node -e \"import\\('./lib/__tests__/mark-absent.test.ts'\\)\")"
+      "Bash(node -e \"import\\('./lib/__tests__/mark-absent.test.ts'\\)\")",
+      "Bash(npm install *)",
+      "mcp__supabase__apply_migration",
+      "Bash(npx tsx *)",
+      "Bash(node -e ' *)"
     ]
   }
 }

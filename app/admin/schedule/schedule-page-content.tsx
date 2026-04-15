@@ -16,6 +16,7 @@ type UserRow = {
   position: string | null
   status: "active" | "inactive"
   startDate: string | null
+  role?: string | null
 }
 
 const fetchUsers = async (): Promise<UserRow[]> => {
@@ -58,6 +59,7 @@ export const SchedulePageContent = () => {
   const summaryMap = new Map(summaries.map((s) => [s.userId, s]))
 
   const filteredUsers = users
+    .filter((u) => u.role !== "admin")
     .filter((u) => {
       if (tab === "no-schedule") return !summaryMap.get(u.id)?.hasSchedule
       return true

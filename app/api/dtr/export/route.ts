@@ -3,7 +3,7 @@ export const runtime = 'nodejs'
 import { NextRequest, NextResponse } from 'next/server'
 import { generateDTR } from '@/lib/dtr/generator'
 import { createClient } from '@/lib/supabase/server'
-import { formatTime12NoAmPm } from '@/lib/format-time'
+import { formatTime12, formatTime12NoAmPm } from '@/lib/format-time'
 import { calcWorkMinutes } from '@/lib/time-calc'
 import { buildDtrExportFileBaseName } from '@/lib/dtr/export-filename'
 import { parsePaperSize } from '@/lib/dtr/paper'
@@ -211,11 +211,24 @@ export async function POST(req: NextRequest) {
       })
     }
 
+    // Build schedule time-range labels for Regular days and Saturdays fields
+    const regularSchedule = scheduleRows.find(
+      (r) => r.custom_date == null && r.day_of_week != null && (r.day_of_week as number) >= 1 && (r.day_of_week as number) <= 5
+    )
+    const saturdaySchedule = scheduleRows.find(
+      (r) => r.custom_date == null && (r.day_of_week as number) === 6
+    )
+
+    const formatScheduleRange = (row: typeof scheduleRows[number] | undefined): string => {
+      if (!row?.time_in || !row?.time_out) return ''
+      return `${formatTime12(row.time_in as string)} - ${formatTime12(row.time_out as string)}`
+    }
+
     const dtrData: DTRData = {
       name: user.full_name,
       month: monthLabel,
-      regular_days: regularPresentCount > 0 ? String(regularPresentCount) : '',
-      saturdays: saturdayPresentCount > 0 ? String(saturdayPresentCount) : '',
+      regular_days: formatScheduleRange(regularSchedule),
+      saturdays: formatScheduleRange(saturdaySchedule),
       total_work_hours: String(Math.floor(totalRegularMinutesMonth / 60)),
       total_work_minutes: String(totalRegularMinutesMonth % 60),
       records,

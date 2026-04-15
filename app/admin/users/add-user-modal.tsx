@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { RefreshCw } from "lucide-react"
 import { Modal } from "@/components/ui/modal"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -40,6 +41,23 @@ export const AddUserModal = ({ open, onClose, onSuccess }: AddUserModalProps) =>
 
   const debouncedEmail = useDebounce(email, 400)
   const debouncedContactNo = useDebounce(contactNo, 400)
+
+  const generatePassword = () => {
+    const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%"
+    const array = new Uint8Array(12)
+    crypto.getRandomValues(array)
+    const generated = Array.from(array)
+      .map((b) => chars[b % chars.length])
+      .join("")
+    setPassword(generated)
+    setConfirmPassword(generated)
+    setFieldErrors((prev) => {
+      const next = { ...prev }
+      delete next.password
+      delete next.confirmPassword
+      return next
+    })
+  }
 
   const resetForm = () => {
     setFullName("")
@@ -317,35 +335,48 @@ export const AddUserModal = ({ open, onClose, onSuccess }: AddUserModalProps) =>
             <option value="admin">Admin</option>
           </select>
         </div>
-        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-          <PasswordInput
-            label="Password"
-            placeholder="••••••••"
-            value={password}
-            onChange={(e) => {
-              setPassword(e.target.value)
-              validateField("password", e.target.value)
-              if (confirmPassword) validateField("confirmPassword", confirmPassword, e.target.value)
-            }}
-            onBlur={(e) => validateField("password", e.target.value)}
-            required
-            minLength={8}
-            helperText="Minimum 8 characters"
-            error={getFieldError("password")}
-          />
-          <PasswordInput
-            label="Confirm password"
-            placeholder="••••••••"
-            value={confirmPassword}
-            onChange={(e) => {
-              setConfirmPassword(e.target.value)
-              validateField("confirmPassword", e.target.value, password)
-            }}
-            onBlur={(e) => validateField("confirmPassword", e.target.value, password)}
-            required
-            minLength={8}
-            error={getFieldError("confirmPassword")}
-          />
+        <div className="flex flex-col gap-3">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Password</span>
+            <button
+              type="button"
+              onClick={generatePassword}
+              className="inline-flex items-center gap-1.5 text-xs text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200"
+            >
+              <RefreshCw className="h-3.5 w-3.5" aria-hidden />
+              Generate password
+            </button>
+          </div>
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 sm:items-start">
+            <PasswordInput
+              id="add-user-password"
+              placeholder="••••••••"
+              value={password}
+              onChange={(e) => {
+                setPassword(e.target.value)
+                validateField("password", e.target.value)
+                if (confirmPassword) validateField("confirmPassword", confirmPassword, e.target.value)
+              }}
+              onBlur={(e) => validateField("password", e.target.value)}
+              required
+              minLength={8}
+              helperText="Minimum 8 characters"
+              error={getFieldError("password")}
+            />
+            <PasswordInput
+              id="add-user-confirm-password"
+              placeholder="Confirm password"
+              value={confirmPassword}
+              onChange={(e) => {
+                setConfirmPassword(e.target.value)
+                validateField("confirmPassword", e.target.value, password)
+              }}
+              onBlur={(e) => validateField("confirmPassword", e.target.value, password)}
+              required
+              minLength={8}
+              error={getFieldError("confirmPassword")}
+            />
+          </div>
         </div>
       </form>
     </Modal>
