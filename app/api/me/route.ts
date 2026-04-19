@@ -15,7 +15,7 @@ export async function GET() {
 
     const { data: userRow } = await supabase
       .from("users")
-      .select("id, user_id, full_name, email, contact_no, position, start_date, avatar_url, status, role, required_hours")
+      .select("id, user_id, full_name, email, contact_no, position, start_date, end_date, avatar_url, status, role, required_hours")
       .eq("email", user.email.toLowerCase())
       .maybeSingle()
 
@@ -32,6 +32,7 @@ export async function GET() {
       contactNo: row.contact_no ?? null,
       position: row.position ?? null,
       startDate: row.start_date ?? null,
+      endDate: row.end_date ?? null,
       avatarUrl: row.avatar_url ?? null,
       status: row.status ?? "active",
       role: (row.role ?? "employee") as "employee" | "admin" | "ojt",
@@ -128,7 +129,7 @@ export async function PATCH(request: Request) {
       .from("users")
       .update(updates)
       .eq("id", userRow.id)
-      .select("id, user_id, full_name, email, contact_no, position, start_date, avatar_url")
+      .select("id, user_id, full_name, email, contact_no, position, start_date, end_date, avatar_url, status, role, required_hours")
       .single()
 
     if (error) {
@@ -147,7 +148,11 @@ export async function PATCH(request: Request) {
       contactNo: row.contact_no ?? null,
       position: row.position ?? null,
       startDate: row.start_date ?? null,
+      endDate: row.end_date ?? null,
       avatarUrl: row.avatar_url ?? null,
+      status: row.status ?? "active",
+      role: (row.role ?? "employee") as "employee" | "admin" | "ojt",
+      requiredHours: (row.required_hours as number | null) ?? null,
     })
   } catch (err) {
     return NextResponse.json(

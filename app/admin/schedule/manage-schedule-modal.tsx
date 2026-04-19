@@ -16,6 +16,9 @@ type UserRow = {
   position: string | null
   status: "active" | "inactive"
   startDate: string | null
+  endDate: string | null
+  role: "employee" | "admin" | "ojt"
+  requiredHours?: number | null
 }
 
 type ScheduleRow = {

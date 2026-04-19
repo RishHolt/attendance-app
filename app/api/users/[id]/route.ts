@@ -137,6 +137,7 @@ export async function PATCH(
       position: string | null
       status: string
       start_date: string | null
+      end_date: string | null
       role: string
     } | null
 
@@ -145,7 +146,7 @@ export async function PATCH(
         .from("users")
         .update(updates)
         .eq("id", id)
-        .select("id, user_id, full_name, email, contact_no, position, status, start_date, role, required_hours")
+        .select("id, user_id, full_name, email, contact_no, position, status, start_date, end_date, role, required_hours")
         .single()
       if (result.error) {
         if (result.error.code === "23505") {
@@ -163,7 +164,7 @@ export async function PATCH(
     } else {
       const result = await supabase
         .from("users")
-        .select("id, user_id, full_name, email, contact_no, position, status, start_date, role, required_hours")
+        .select("id, user_id, full_name, email, contact_no, position, status, start_date, end_date, role, required_hours")
         .eq("id", id)
         .single()
       if (result.error) {
@@ -188,6 +189,7 @@ export async function PATCH(
       position: data.position,
       status: data.status as "active" | "inactive",
       startDate: data.start_date ?? null,
+      endDate: data.end_date ?? null,
       role: (data.role ?? "employee") as "employee" | "admin" | "ojt",
       requiredHours: (data as Record<string, unknown>).required_hours as number | null ?? null,
     }

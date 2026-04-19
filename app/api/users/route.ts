@@ -18,7 +18,7 @@ export async function GET() {
 
     const withStartDate = await supabase
       .from("users")
-      .select("id, user_id, full_name, email, contact_no, position, status, start_date, role, required_hours, avatar_url")
+      .select("id, user_id, full_name, email, contact_no, position, status, start_date, end_date, role, required_hours, avatar_url")
       .order("created_at", { ascending: false })
 
     const msg = String(withStartDate.error?.message ?? "").toLowerCase()
@@ -35,7 +35,7 @@ export async function GET() {
       return NextResponse.json({ error: result.error.message }, { status: 500 })
     }
 
-    const rows = (result.data ?? []) as Array<Record<string, unknown> & { start_date?: string | null }>
+    const rows = (result.data ?? []) as Array<Record<string, unknown> & { start_date?: string | null; end_date?: string | null }>
     const users: UserRow[] = rows.map((row) => ({
       id: String(row.id),
       userId: String(row.user_id),
@@ -45,6 +45,7 @@ export async function GET() {
       position: row.position as string | null,
       status: row.status as "active" | "inactive",
       startDate: (row.start_date as string | null) ?? null,
+      endDate: (row.end_date as string | null) ?? null,
       role: ((row.role as string | null) ?? "employee") as "employee" | "admin" | "ojt",
       requiredHours: (row.required_hours as number | null) ?? null,
       avatarUrl: (row.avatar_url as string | null) ?? null,
@@ -172,7 +173,7 @@ export async function POST(request: Request) {
       const { data, error } = await clientToUse
         .from("users")
         .insert(insertPayload)
-        .select("id, user_id, full_name, email, contact_no, position, status, role, required_hours")
+        .select("id, user_id, full_name, email, contact_no, position, status, role, required_hours, start_date, end_date, avatar_url")
         .single()
 
       if (!error) {
@@ -184,9 +185,11 @@ export async function POST(request: Request) {
           contactNo: data.contact_no,
           position: data.position,
           status: data.status as "active" | "inactive",
-          startDate: null,
+          startDate: data.start_date ?? null,
+          endDate: data.end_date ?? null,
           role: (data.role ?? "employee") as "employee" | "admin" | "ojt",
           requiredHours: (data as Record<string, unknown>).required_hours as number | null ?? null,
+          avatarUrl: data.avatar_url ?? null,
         }
         return NextResponse.json(user, { status: 201 })
       }

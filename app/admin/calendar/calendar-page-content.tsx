@@ -21,9 +21,10 @@ type UserRow = {
   email: string
   contactNo: string | null
   position: string | null
+  status: "active" | "inactive"
   startDate: string | null
-  status?: string | null
-  role?: "employee" | "admin" | "ojt"
+  endDate: string | null
+  role: "employee" | "admin" | "ojt"
   requiredHours?: number | null
 }
 
