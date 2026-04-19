@@ -30,6 +30,7 @@ type UserRow = {
   status: "active" | "inactive"
   startDate: string | null
   role: "employee" | "admin" | "ojt"
+  requiredHours?: number | null
 }
 
 type EditUserModalProps = {
@@ -50,6 +51,8 @@ export const EditUserModal = ({
   const [contactNo, setContactNo] = useState("")
   const [position, setPosition] = useState("")
   const [role, setRole] = useState<"employee" | "admin" | "ojt">("employee")
+  const [requiredHours, setRequiredHours] = useState<string>("")
+  const [ojtProgress, setOjtProgress] = useState<{ hoursCompleted: number; percent: number | null } | null>(null)
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -57,6 +60,17 @@ export const EditUserModal = ({
   const [availabilityErrors, setAvailabilityErrors] = useState<Record<string, string>>({})
   const [serverErrorField, setServerErrorField] = useState<"email" | "contactNo" | "password" | null>(null)
   const [serverErrorMessage, setServerErrorMessage] = useState("")
+
+  useEffect(() => {
+    if (!user || user.role !== "ojt") { setOjtProgress(null); return }
+    fetch("/api/users/ojt-progress")
+      .then((r) => r.ok ? r.json() : null)
+      .then((data: { userId: string; hoursCompleted: number; percent: number | null }[] | null) => {
+        const entry = data?.find((p) => p.userId === user.id)
+        if (entry) setOjtProgress({ hoursCompleted: entry.hoursCompleted, percent: entry.percent })
+      })
+      .catch(() => {})
+  }, [user])
 
   const debouncedEmail = useDebounce(email, 400)
   const debouncedContactNo = useDebounce(contactNo, 400)
@@ -68,6 +82,8 @@ export const EditUserModal = ({
       setContactNo(user.contactNo ?? "")
       setPosition(user.position ?? "")
       setRole(user.role ?? "employee")
+      setRequiredHours(user.requiredHours != null ? String(user.requiredHours) : "")
+      setOjtProgress(null)
       setPassword("")
       setConfirmPassword("")
       setFieldErrors({})
@@ -225,6 +241,7 @@ export const EditUserModal = ({
     contactNo !== (user.contactNo ?? "") ||
     position !== (user.position ?? "") ||
     role !== (user.role ?? "employee") ||
+    requiredHours !== (user.requiredHours != null ? String(user.requiredHours) : "") ||
     (password.trim().length > 0 && password === confirmPassword)
 
   const handleClose = () => {
@@ -263,6 +280,7 @@ export const EditUserModal = ({
           contactNo,
           position,
           role,
+          requiredHours: role === "ojt" && requiredHours.trim() ? Number(requiredHours) : null,
           ...(password.trim() ? { password: password.trim() } : {}),
         }),
       })
@@ -387,6 +405,45 @@ export const EditUserModal = ({
             </select>
           </div>
         </div>
+        {role === "ojt" && (
+          <div className="flex flex-col gap-3">
+            <Input
+              label="Required hours"
+              placeholder="e.g. 486"
+              type="number"
+              min={1}
+              value={requiredHours}
+              onChange={(e) => setRequiredHours(e.target.value)}
+              helperText="Total OJT hours target (if required)"
+            />
+            {ojtProgress && (
+              <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-700 dark:bg-zinc-800/50">
+                <p className="mb-2 text-xs font-medium uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+                  Required Time Progress
+                </p>
+                <p className="text-sm text-zinc-900 dark:text-zinc-100">
+                  <span className="font-semibold tabular-nums">{ojtProgress.hoursCompleted}</span>
+                  {requiredHours.trim() ? (
+                    <> / <span className="tabular-nums">{requiredHours}</span> hrs</>
+                  ) : " hrs completed"}
+                  {ojtProgress.percent != null && (
+                    <span className="ml-2 text-zinc-500 dark:text-zinc-400">({ojtProgress.percent}%)</span>
+                  )}
+                </p>
+                {ojtProgress.percent != null && (
+                  <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-700">
+                    <div
+                      className="relative h-2 overflow-hidden rounded-full bg-violet-500 transition-all"
+                      style={{ width: `${ojtProgress.percent}%` }}
+                    >
+                      <div className="animate-shimmer absolute inset-0 w-1/2 bg-gradient-to-r from-transparent via-white/30 to-transparent" />
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
         <div className="flex flex-col gap-3">
           <div className="flex items-center justify-between">
             <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Password</span>

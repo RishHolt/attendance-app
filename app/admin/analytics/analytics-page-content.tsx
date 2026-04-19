@@ -28,6 +28,7 @@ import {
   Percent,
   ChevronLeft,
   ChevronRight,
+  UserCheck,
 } from "lucide-react"
 import { PageHeader } from "@/components/admin/page-header"
 import { Button, Card, Input } from "@/components/ui"
@@ -150,7 +151,7 @@ export const AnalyticsPageContent = () => {
   const [from, setFrom] = useState(defaultFrom)
   const [to, setTo] = useState(defaultTo)
   const [employeePage, setEmployeePage] = useState(1)
-  const [whoByDayTab, setWhoByDayTab] = useState<"present" | "absent">("present")
+  const [whoByDayActiveDate, setWhoByDayActiveDate] = useState<string>("")
   const [whoByDayFrom, setWhoByDayFrom] = useState(defaultFrom)
   const [whoByDayTo, setWhoByDayTo] = useState(defaultTo)
   const [whoByDayData, setWhoByDayData] = useState<{ dailyBreakdown: DayBreakdown[] } | null>(null)
@@ -217,6 +218,7 @@ export const AnalyticsPageContent = () => {
 
   useEffect(() => {
     loadWhoByDayData()
+    setWhoByDayActiveDate("")
   }, [loadWhoByDayData])
 
   useEffect(() => {
@@ -357,7 +359,53 @@ export const AnalyticsPageContent = () => {
 
       {overview && (
         <>
-          {/* KPI cards */}
+          {/* KPI cards — row 1: count summary */}
+          <div className="grid grid-cols-3 gap-4">
+            <Card variant="default" padding="md">
+              <div className="flex items-center gap-3">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-emerald-500">
+                  <UserCheck className="h-5 w-5 text-white" aria-hidden />
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400">Present</p>
+                  <p className="text-2xl font-bold tabular-nums text-zinc-900 dark:text-zinc-100">
+                    {totalPresent}
+                  </p>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400">selected range</p>
+                </div>
+              </div>
+            </Card>
+            <Card variant="default" padding="md">
+              <div className="flex items-center gap-3">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-amber-500">
+                  <Clock className="h-5 w-5 text-white" aria-hidden />
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400">Late</p>
+                  <p className="text-2xl font-bold tabular-nums text-zinc-900 dark:text-zinc-100">
+                    {totalLate}
+                  </p>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400">selected range</p>
+                </div>
+              </div>
+            </Card>
+            <Card variant="default" padding="md">
+              <div className="flex items-center gap-3">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-red-500">
+                  <XCircle className="h-5 w-5 text-white" aria-hidden />
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400">Absent</p>
+                  <p className="text-2xl font-bold tabular-nums text-zinc-900 dark:text-zinc-100">
+                    {totalAbsent}
+                  </p>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400">selected range</p>
+                </div>
+              </div>
+            </Card>
+          </div>
+
+          {/* KPI cards — row 2: rate/approval metrics */}
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
             <Card variant="default" padding="md">
               <div className="flex items-center gap-3">
@@ -658,97 +706,93 @@ export const AnalyticsPageContent = () => {
                 </div>
               </div>
             </div>
-            <div
-              className="mb-5 flex gap-1.5 rounded-xl border border-zinc-200 bg-zinc-100/80 p-1.5 dark:border-zinc-700 dark:bg-zinc-800/80"
-              role="tablist"
-              aria-label="Filter by status"
-            >
-              <button
-                type="button"
-                role="tab"
-                aria-selected={whoByDayTab === "present"}
-                onClick={() => setWhoByDayTab("present")}
-                className={`min-h-[44px] flex-1 rounded-lg px-4 py-2.5 text-sm font-medium transition-all ${
-                  whoByDayTab === "present"
-                    ? "bg-white text-zinc-900 shadow-sm ring-1 ring-zinc-200/80 dark:bg-zinc-700 dark:text-zinc-100 dark:ring-zinc-600"
-                    : "text-zinc-600 hover:bg-white/50 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-700/50 dark:hover:text-zinc-100"
-                }`}
-              >
-                Present
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={whoByDayTab === "absent"}
-                onClick={() => setWhoByDayTab("absent")}
-                className={`min-h-[44px] flex-1 rounded-lg px-4 py-2.5 text-sm font-medium transition-all ${
-                  whoByDayTab === "absent"
-                    ? "bg-white text-zinc-900 shadow-sm ring-1 ring-zinc-200/80 dark:bg-zinc-700 dark:text-zinc-100 dark:ring-zinc-600"
-                    : "text-zinc-600 hover:bg-white/50 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-700/50 dark:hover:text-zinc-100"
-                }`}
-              >
-                Absent
-              </button>
-            </div>
             {whoByDayLoading ? (
               <div className="flex h-48 items-center justify-center rounded-xl bg-zinc-50 dark:bg-zinc-800/50">
                 <Loader2 className="h-8 w-8 animate-spin text-zinc-400" aria-hidden />
                 <span className="sr-only">Loading who is in by day</span>
               </div>
-            ) : (
-            <div className="max-h-[520px] overflow-y-auto pr-1">
-              <div className="grid gap-4 pb-1 sm:grid-cols-2 lg:grid-cols-3">
-              {whoByDayBreakdown.length === 0 ? (
-                <p className="col-span-full py-8 text-center text-sm text-zinc-500 dark:text-zinc-400">
-                  No days in this range. Adjust the start or end date.
-                </p>
-              ) : (
-              whoByDayBreakdown.map((day) => {
-                  const presentAndLate = [...day.present, ...day.late]
-                  const list = whoByDayTab === "present" ? presentAndLate : day.absent
-                  return (
-                    <div
-                      key={day.date}
-                      className="overflow-hidden rounded-xl border border-zinc-200/80 bg-white shadow-sm dark:border-zinc-700/50 dark:bg-zinc-900/90"
-                    >
-                      <div className="border-b border-zinc-100 px-4 py-3 dark:border-zinc-800">
-                        <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
-                          {formatDateWithWeekday(day.date)}
-                        </p>
-                        <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
-                          {list.length} {list.length === 1 ? "person" : "people"}
-                        </p>
-                      </div>
-                      <div className="p-3">
-                        {list.length === 0 ? (
-                          <p className="text-sm italic text-zinc-400 dark:text-zinc-500">
-                            {whoByDayTab === "present" ? "No one" : "No one absent"}
-                          </p>
-                        ) : (
-                          <ul className="space-y-1.5">
-                            {list.map((u, i) => (
-                              <li
-                                key={`${day.date}-${i}-${u.fullName}`}
-                                className="flex items-baseline justify-between gap-2 text-sm text-zinc-900 dark:text-zinc-100"
-                              >
-                                <span className="min-w-0 truncate font-medium">{u.fullName}</span>
-                                {u.userDisplayId ? (
-                                  <span className="shrink-0 text-xs tabular-nums text-zinc-500 dark:text-zinc-400">
-                                    {u.userDisplayId}
-                                  </span>
-                                ) : null}
-                              </li>
-                            ))}
-                          </ul>
-                        )}
-                      </div>
-                    </div>
-                  )
-                })
-                )}
-              </div>
-            </div>
-            )}
+            ) : whoByDayBreakdown.length === 0 ? (
+              <p className="py-8 text-center text-sm text-zinc-500 dark:text-zinc-400">
+                No days in this range. Adjust the start or end date.
+              </p>
+            ) : (() => {
+              const days = whoByDayBreakdown.filter((day) => {
+                const dow = new Date(day.date + "T00:00:00").getDay()
+                const hasRecords = day.present.length + day.late.length + day.absent.length > 0
+                return dow !== 0 || hasRecords
+              })
+              if (days.length === 0) return (
+                <p className="py-8 text-center text-sm text-zinc-500 dark:text-zinc-400">No records in this range.</p>
+              )
+              const activeDateStr = whoByDayActiveDate && days.find((d) => d.date === whoByDayActiveDate)
+                ? whoByDayActiveDate
+                : days[days.length - 1]!.date
+              const activeDay = days.find((d) => d.date === activeDateStr)!
+              const allUsers = [
+                ...activeDay.present.map((u) => ({ ...u, status: "present" as const })),
+                ...activeDay.late.map((u) => ({ ...u, status: "late" as const })),
+                ...activeDay.absent.map((u) => ({ ...u, status: "absent" as const })),
+              ]
+              return (
+                <>
+                  <div className="mb-3 flex gap-1 overflow-x-auto rounded-xl border border-zinc-200 bg-zinc-100/80 p-1.5 dark:border-zinc-700 dark:bg-zinc-800/80">
+                    {days.map((day) => {
+                      const d = new Date(day.date + "T00:00:00")
+                      const dayName = d.toLocaleDateString("en-US", { weekday: "short" })
+                      const monthDay = d.toLocaleDateString("en-US", { month: "short", day: "numeric" })
+                      const isActive = day.date === activeDateStr
+                      return (
+                        <button
+                          key={day.date}
+                          type="button"
+                          onClick={() => setWhoByDayActiveDate(day.date)}
+                          className={`flex min-w-[64px] flex-1 flex-col items-center rounded-lg px-3 py-2 text-sm font-medium transition-all ${
+                            isActive
+                              ? "bg-white text-zinc-900 shadow-sm ring-1 ring-zinc-200/80 dark:bg-zinc-700 dark:text-zinc-100 dark:ring-zinc-600"
+                              : "text-zinc-600 hover:bg-white/50 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-700/50 dark:hover:text-zinc-100"
+                          }`}
+                        >
+                          <span>{dayName}</span>
+                          <span className="text-xs tabular-nums opacity-70">{monthDay}</span>
+                        </button>
+                      )
+                    })}
+                  </div>
+                  <div className="overflow-x-auto rounded-xl border border-zinc-200/80 bg-white dark:border-zinc-700/50 dark:bg-zinc-900/90">
+                    {allUsers.length === 0 ? (
+                      <p className="px-4 py-6 text-center text-sm italic text-zinc-400 dark:text-zinc-500">No records</p>
+                    ) : (
+                      <table className="w-full min-w-[300px] text-sm">
+                        <thead>
+                          <tr className="border-b border-zinc-100 dark:border-zinc-800">
+                            <th className="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Employee</th>
+                            <th className="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Status</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {allUsers.map((u, i) => (
+                            <tr key={`${activeDateStr}-${i}`} className="border-b border-zinc-100 last:border-0 dark:border-zinc-800/50">
+                              <td className={`px-4 py-2.5 font-medium ${
+                                u.status === "absent" ? "text-red-500 dark:text-red-400" : "text-emerald-600 dark:text-emerald-400"
+                              }`}>{u.fullName}</td>
+                              <td className="px-4 py-2.5">
+                                <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
+                                  u.status === "present"
+                                    ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400"
+                                    : u.status === "late"
+                                      ? "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400"
+                                      : "bg-red-100 text-red-600 dark:bg-red-900/40 dark:text-red-400"
+                                }`}>{u.status}</span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    )}
+                  </div>
+                </>
+              )
+            })()}
           </Card>
 
           {/* By employee */}

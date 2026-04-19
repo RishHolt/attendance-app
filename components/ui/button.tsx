@@ -7,7 +7,7 @@ const buttonBaseStyles =
 
 const buttonVariants = {
   default:
-    "bg-zinc-900 text-white shadow-sm hover:bg-zinc-800 focus:ring-zinc-400 focus:ring-offset-white dark:bg-zinc-100 dark:text-zinc-900 dark:shadow-zinc-950/30 dark:hover:bg-zinc-200 dark:focus:ring-zinc-600 dark:focus:ring-offset-zinc-950",
+    "bg-blue-600 text-white shadow-sm hover:bg-blue-700 focus:ring-blue-400 focus:ring-offset-white dark:bg-blue-600 dark:text-white dark:shadow-blue-950/30 dark:hover:bg-blue-500 dark:focus:ring-blue-500 dark:focus:ring-offset-zinc-950",
   secondary:
     "border border-zinc-200 bg-white text-zinc-900 shadow-sm hover:border-zinc-300 hover:bg-zinc-50 focus:ring-zinc-400 dark:border-zinc-700 dark:bg-zinc-800/50 dark:text-zinc-100 dark:hover:border-zinc-600 dark:hover:bg-zinc-800 dark:focus:ring-zinc-500 dark:focus:ring-offset-zinc-950",
   ghost:

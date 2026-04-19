@@ -15,10 +15,13 @@ type MeUser = {
   contactNo: string | null
   position: string | null
   startDate: string | null
+  role: "employee" | "admin" | "ojt"
+  requiredHours: number | null
 }
 
 export default function UserProfilePage() {
   const [me, setMe] = useState<MeUser | null>(null)
+  const [ojtHours, setOjtHours] = useState<number | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [editModalOpen, setEditModalOpen] = useState(false)
 
@@ -26,6 +29,15 @@ export default function UserProfilePage() {
     const res = await fetch("/api/me")
     const data = res.ok ? await res.json() : null
     setMe(data)
+    if (data?.role === "ojt") {
+      fetch("/api/users/ojt-progress")
+        .then((r) => r.ok ? r.json() : [])
+        .then((list: { userId: string; hoursCompleted: number }[]) => {
+          const entry = list.find((p) => p.userId === data.id)
+          if (entry) setOjtHours(entry.hoursCompleted)
+        })
+        .catch(() => {})
+    }
   }, [])
 
   useEffect(() => {
@@ -118,6 +130,34 @@ export default function UserProfilePage() {
           </p>
         )}
       </PageSection>
+
+      {me?.role === "ojt" && me.requiredHours != null && (
+        <PageSection title="Required Time Progress">
+          <div className="space-y-3">
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-zinc-600 dark:text-zinc-400">Hours completed</span>
+              <span className="font-semibold tabular-nums text-zinc-900 dark:text-zinc-100">
+                {ojtHours ?? 0} / {me.requiredHours} hrs
+              </span>
+            </div>
+            <div className="h-3 w-full overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-700">
+              <div
+                className="relative h-3 overflow-hidden rounded-full bg-violet-500 transition-all"
+                style={{
+                  width: `${me.requiredHours > 0 ? Math.min(100, Math.round(((ojtHours ?? 0) / me.requiredHours) * 100)) : 0}%`,
+                }}
+              >
+                <div className="animate-shimmer absolute inset-0 w-1/2 bg-gradient-to-r from-transparent via-white/30 to-transparent" />
+              </div>
+            </div>
+            <p className="text-right text-xs tabular-nums text-zinc-500 dark:text-zinc-400">
+              {me.requiredHours > 0
+                ? `${Math.min(100, Math.round(((ojtHours ?? 0) / me.requiredHours) * 100))}% complete`
+                : ""}
+            </p>
+          </div>
+        </PageSection>
+      )}
 
       {me && (
         <EditProfileModal

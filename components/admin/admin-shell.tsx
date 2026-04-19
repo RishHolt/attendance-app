@@ -9,7 +9,6 @@ import {
   CalendarRange,
   CalendarDays,
   Users,
-  Settings,
   Menu,
   X,
   BarChart3,
@@ -28,7 +27,6 @@ const sidebarNav = [
   { href: "/admin/calendar", label: "Calendar", icon: CalendarDays },
   { href: "/admin/schedule", label: "Schedule", icon: CalendarRange },
   { href: "/admin/users", label: "Users", icon: Users },
-  { href: "/admin/settings", label: "Settings", icon: Settings },
 ]
 
 type AdminShellProps = {
@@ -83,7 +81,7 @@ export const AdminShell = ({ children, userName }: AdminShellProps) => {
               href={item.href}
               className={`group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200 ${
                 isActive
-                  ? "bg-zinc-900 text-white shadow-sm dark:bg-zinc-100 dark:text-zinc-900"
+                  ? "bg-blue-600 text-white shadow-sm dark:bg-blue-600 dark:text-white"
                   : "text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
               }`}
             >

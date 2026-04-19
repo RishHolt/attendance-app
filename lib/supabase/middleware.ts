@@ -25,7 +25,28 @@ export async function updateSession(request: NextRequest) {
     }
   )
 
-  await supabase.auth.getUser()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  // Protect /admin/* page routes — unauthenticated → login, non-admin → user area
+  if (request.nextUrl.pathname.startsWith("/admin")) {
+    if (!user) {
+      return NextResponse.redirect(new URL("/login", request.url))
+    }
+
+    const adminEmail = process.env.LOCAL_ADMIN_EMAIL?.trim()
+    const isEnvAdmin = adminEmail && user.email?.toLowerCase() === adminEmail.toLowerCase()
+
+    if (!isEnvAdmin) {
+      const { data } = await supabase
+        .from("users")
+        .select("role")
+        .eq("email", user.email!.toLowerCase())
+        .single()
+      if (data?.role !== "admin") {
+        return NextResponse.redirect(new URL("/user/attendance", request.url))
+      }
+    }
+  }
 
   return supabaseResponse
 }

@@ -77,7 +77,10 @@ export async function GET(request: Request) {
     if (userIdsFilter && userIdsFilter.length > 0) {
       query = query.in("user_id", userIdsFilter)
     }
-    query = query.gte("attendance_date", from).lte("attendance_date", to).range(offset, offset + limit - 1)
+    if (approvalStatus !== "pending") {
+      query = query.gte("attendance_date", from).lte("attendance_date", to)
+    }
+    query = query.range(offset, offset + limit - 1)
 
     const { data: attendancesData, error: attError, count } = await query
 

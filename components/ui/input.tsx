@@ -9,7 +9,7 @@ const inputBaseStyles =
 
 const inputVariants = {
   default:
-    "border-zinc-200 hover:border-zinc-300 focus:border-zinc-400 focus:ring-zinc-200 dark:border-zinc-700 dark:hover:border-zinc-600 dark:focus:border-zinc-500 dark:focus:ring-zinc-800",
+    "border-zinc-200 hover:border-zinc-300 focus:border-blue-400 focus:ring-blue-200 dark:border-zinc-700 dark:hover:border-zinc-600 dark:focus:border-blue-500 dark:focus:ring-blue-900/50",
   error:
     "border-red-400 focus:border-red-500 focus:ring-red-200 dark:border-red-500 dark:focus:ring-red-950/50",
 }

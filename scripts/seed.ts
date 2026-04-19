@@ -36,6 +36,12 @@ const FAKE_NAMES = [
 
 const POSITIONS = ["Developer", "Designer", "Manager", "Analyst", "Engineer"]
 
+// Roles: index 0 = admin, index 1 = ojt, rest = employee
+const ROLES: ("employee" | "admin" | "ojt")[] = [
+  "admin", "ojt", "employee", "employee", "employee",
+  "employee", "employee", "ojt", "employee", "employee",
+]
+
 const generateUserId = () => String(Math.floor(Math.random() * 89999999) + 10000000)
 
 function getWorkdaysInRange(from: Date, to: Date): Date[] {
@@ -77,6 +83,7 @@ async function seed() {
     position: POSITIONS[i % POSITIONS.length],
     status: "active" as const,
     start_date: "2024-01-15",
+    role: ROLES[i] ?? "employee",
   }))
 
   const { data: insertedUsers, error: usersError } = await supabase

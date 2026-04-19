@@ -22,6 +22,14 @@ type MeUser = {
   fullName: string
   email: string
   position?: string | null
+  role: "employee" | "admin" | "ojt"
+  requiredHours: number | null
+}
+
+type OjtProgress = {
+  hoursCompleted: number
+  requiredHours: number | null
+  percent: number | null
 }
 
 type AttendanceRow = {
@@ -138,6 +146,7 @@ export const DashboardPageContent = () => {
   })
   const [schedules, setSchedules] = useState<ScheduleRow[]>([])
   const [todaySchedule, setTodaySchedule] = useState<ScheduleRow | null>(null)
+  const [ojtProgress, setOjtProgress] = useState<OjtProgress | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
 
@@ -157,6 +166,13 @@ export const DashboardPageContent = () => {
       const userId = meData.id
       const today = getTodayISO()
       const { from, to } = getThisMonthRange()
+
+      if (meData.role === "ojt") {
+        fetch("/api/me/ojt-progress")
+          .then((r) => (r.ok ? r.json() : null))
+          .then((data) => { if (data) setOjtProgress(data) })
+          .catch(() => {})
+      }
 
       const [attTodayRes, attMonthRes, schedRes] = await Promise.all([
         fetch(`/api/users/${userId}/attendances?from=${today}&to=${today}`),
@@ -271,6 +287,58 @@ export const DashboardPageContent = () => {
       description={`${getGreeting()}, ${firstName}. Here's your attendance overview.`}
     >
       <div className="space-y-8">
+
+        {/* Required Time Progress */}
+        {me?.role === "ojt" && (
+          <PageSection title="Required Time Progress">
+            {ojtProgress ? (
+              <div className="space-y-3">
+                <div className="flex items-end justify-between gap-2">
+                  <div>
+                    <p className="text-3xl font-bold tabular-nums text-zinc-900 dark:text-zinc-100">
+                      {ojtProgress.hoursCompleted}
+                      <span className="ml-1 text-base font-medium text-zinc-500 dark:text-zinc-400">
+                        hrs
+                      </span>
+                    </p>
+                    {ojtProgress.requiredHours != null && (
+                      <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                        of {ojtProgress.requiredHours} required hours
+                      </p>
+                    )}
+                  </div>
+                  {ojtProgress.percent != null && (
+                    <p className="text-2xl font-semibold tabular-nums text-violet-600 dark:text-violet-400">
+                      {ojtProgress.percent}%
+                    </p>
+                  )}
+                </div>
+                {ojtProgress.percent != null && (
+                  <div className="h-3 w-full overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-700">
+                    <div
+                      className="relative h-3 overflow-hidden rounded-full bg-violet-500 transition-all"
+                      style={{ width: `${ojtProgress.percent}%` }}
+                    >
+                      <div className="animate-shimmer absolute inset-0 w-1/2 bg-gradient-to-r from-transparent via-white/30 to-transparent" />
+                    </div>
+                  </div>
+                )}
+                {ojtProgress.percent === 100 && (
+                  <p className="text-sm font-medium text-emerald-600 dark:text-emerald-400">
+                    Required hours completed!
+                  </p>
+                )}
+              </div>
+            ) : (
+              <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                {me.requiredHours
+                  ? "No approved attendance records yet"
+                  : "No required hours set — contact your admin"}
+              </p>
+            )}
+          </PageSection>
+        )}
+
         {/* Today's status */}
         <PageSection title="Today's status">
           {todaySchedule ? (

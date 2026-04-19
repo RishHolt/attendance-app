@@ -40,7 +40,11 @@ type UserRow = {
   status: "active" | "inactive"
   startDate: string | null
   role: "employee" | "admin" | "ojt"
+  requiredHours?: number | null
+  avatarUrl?: string | null
 }
+
+type OjtProgressEntry = { userId: string; hoursCompleted: number; percent: number | null }
 
 const roleBadge: Record<string, { label: string; className: string }> = {
   ojt: { label: "OJT", className: "bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-400" },
@@ -165,9 +169,27 @@ const UserActionsDropdown = ({
   )
 }
 
+const UserAvatar = ({ user }: { user: UserRow }) => {
+  if (user.avatarUrl) {
+    return (
+      <img
+        src={user.avatarUrl}
+        alt={user.fullName}
+        className="h-10 w-10 shrink-0 rounded-full object-cover"
+      />
+    )
+  }
+  return (
+    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-zinc-200 font-medium text-zinc-600 dark:bg-zinc-700 dark:text-zinc-300">
+      {user.fullName.charAt(0).toUpperCase()}
+    </div>
+  )
+}
+
 export const UsersPageContent = () => {
   const [search, setSearch] = useState("")
   const [users, setUsers] = useState<UserRow[]>([])
+  const [ojtProgress, setOjtProgress] = useState<OjtProgressEntry[]>([])
   const [loadError, setLoadError] = useState<string | null>(null)
   const [addUserOpen, setAddUserOpen] = useState(false)
   const [editUser, setEditUser] = useState<UserRow | null>(null)
@@ -180,8 +202,12 @@ export const UsersPageContent = () => {
     const load = async () => {
       setIsLoading(true)
       setLoadError(null)
-      const { users: data, error } = await fetchUsers()
+      const [{ users: data, error }, progressRes] = await Promise.all([
+        fetchUsers(),
+        fetch("/api/users/ojt-progress").then((r) => r.ok ? r.json() : []).catch(() => []),
+      ])
       setUsers(data)
+      setOjtProgress(progressRes)
       setLoadError(error ?? null)
       setIsLoading(false)
     }
@@ -191,8 +217,12 @@ export const UsersPageContent = () => {
   const handleUsersRefresh = async () => {
     setLoadError(null)
     setIsLoading(true)
-    const { users: data, error } = await fetchUsers()
+    const [{ users: data, error }, progressRes] = await Promise.all([
+      fetchUsers(),
+      fetch("/api/users/ojt-progress").then((r) => r.ok ? r.json() : []).catch(() => []),
+    ])
     setUsers(data)
+    setOjtProgress(progressRes)
     setLoadError(error ?? null)
     setIsLoading(false)
   }
@@ -352,9 +382,7 @@ export const UsersPageContent = () => {
                     <TableRow key={user.id}>
                       <TableCell>
                         <div className="flex items-center gap-3">
-                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-zinc-200 font-medium text-zinc-600 dark:bg-zinc-700 dark:text-zinc-300">
-                            {user.fullName.charAt(0).toUpperCase()}
-                          </div>
+                          <UserAvatar user={user} />
                           <div className="flex flex-col gap-0.5">
                             <span className="font-medium text-zinc-900 dark:text-zinc-100">
                               {user.fullName}
@@ -377,6 +405,24 @@ export const UsersPageContent = () => {
                           <span className={`inline-flex w-fit rounded-full px-2.5 py-0.5 text-xs font-medium ${(roleBadge[user.role] ?? roleBadge.employee).className}`}>
                             {(roleBadge[user.role] ?? roleBadge.employee).label}
                           </span>
+                          {user.role === "ojt" && (() => {
+                            const p = ojtProgress.find((x) => x.userId === user.id)
+                            if (!p || user.requiredHours == null) return null
+                            return (
+                              <div className="mt-1 w-28">
+                                <div className="flex items-center justify-between text-xs text-zinc-500 dark:text-zinc-400">
+                                  <span className="tabular-nums">{p.hoursCompleted}h</span>
+                                  <span className="tabular-nums">{user.requiredHours}h</span>
+                                </div>
+                                <div className="mt-0.5 h-1.5 w-full overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-700">
+                                  <div
+                                    className="h-1.5 rounded-full bg-violet-500"
+                                    style={{ width: `${p.percent ?? 0}%` }}
+                                  />
+                                </div>
+                              </div>
+                            )
+                          })()}
                         </div>
                       </TableCell>
                       <TableCell>
@@ -413,9 +459,7 @@ export const UsersPageContent = () => {
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex min-w-0 flex-1 items-center gap-3">
-                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-zinc-200 font-medium text-zinc-600 dark:bg-zinc-700 dark:text-zinc-300">
-                          {user.fullName.charAt(0).toUpperCase()}
-                        </div>
+                        <UserAvatar user={user} />
                         <div className="min-w-0 flex-1">
                           <p className="truncate font-medium text-zinc-900 dark:text-zinc-100">
                             {user.fullName}
@@ -439,6 +483,24 @@ export const UsersPageContent = () => {
                           <span className={`mt-1 inline-flex w-fit rounded-full px-2 py-0.5 text-xs font-medium ${(roleBadge[user.role] ?? roleBadge.employee).className}`}>
                             {(roleBadge[user.role] ?? roleBadge.employee).label}
                           </span>
+                          {user.role === "ojt" && (() => {
+                            const p = ojtProgress.find((x) => x.userId === user.id)
+                            if (!p || user.requiredHours == null) return null
+                            return (
+                              <div className="mt-1 w-32">
+                                <div className="flex items-center justify-between text-xs text-zinc-500 dark:text-zinc-400">
+                                  <span className="tabular-nums">{p.hoursCompleted}h / {user.requiredHours}h</span>
+                                  {p.percent != null && <span className="tabular-nums">{p.percent}%</span>}
+                                </div>
+                                <div className="mt-0.5 h-1.5 w-full overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-700">
+                                  <div
+                                    className="h-1.5 rounded-full bg-violet-500"
+                                    style={{ width: `${p.percent ?? 0}%` }}
+                                  />
+                                </div>
+                              </div>
+                            )
+                          })()}
                           <div className="mt-1 flex flex-wrap gap-2">
                             <span
                               className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${

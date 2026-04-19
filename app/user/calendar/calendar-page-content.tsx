@@ -18,6 +18,15 @@ type MeUser = {
   id: string
   fullName: string
   startDate: string | null
+  status?: string
+  role: "employee" | "admin" | "ojt"
+  requiredHours: number | null
+}
+
+type OjtProgress = {
+  hoursCompleted: number
+  requiredHours: number | null
+  percent: number | null
 }
 
 type AttendanceRow = {
@@ -38,6 +47,7 @@ const LEGENDS: { status: AttendanceStatus; label: string; color: string; bg: str
   { status: "present", label: "Present", color: "text-emerald-700 dark:text-emerald-400", bg: "bg-emerald-100 dark:bg-emerald-900/40", dot: "bg-emerald-500" },
   { status: "late", label: "Late", color: "text-amber-700 dark:text-amber-400", bg: "bg-amber-100 dark:bg-amber-900/40", dot: "bg-amber-500" },
   { status: "absent", label: "Absent", color: "text-red-700 dark:text-red-400", bg: "bg-red-100 dark:bg-red-900/40", dot: "bg-red-500" },
+  { status: "pending", label: "Pending", color: "text-orange-700 dark:text-orange-400", bg: "bg-orange-100 dark:bg-orange-900/40", dot: "bg-orange-500" },
   { status: "today", label: "Today", color: "text-blue-700 dark:text-blue-400", bg: "bg-blue-100 dark:bg-blue-900/40", dot: "bg-blue-500" },
   { status: "upcoming", label: "Upcoming", color: "text-violet-700 dark:text-violet-400", bg: "bg-violet-100 dark:bg-violet-900/40", dot: "bg-violet-500" },
   { status: "no-schedule", label: "No schedule", color: "text-zinc-500 dark:text-zinc-400", bg: "bg-zinc-100 dark:bg-zinc-800", dot: "bg-zinc-400" },
@@ -142,6 +152,7 @@ export const UserCalendarPageContent = () => {
   const [hoursRangeTo, setHoursRangeTo] = useState("")
   const [draftFrom, setDraftFrom] = useState("")
   const [draftTo, setDraftTo] = useState("")
+  const [ojtProgress, setOjtProgress] = useState<OjtProgress | null>(null)
   const [hoursFilterOpen, setHoursFilterOpen] = useState(false)
   const hoursFilterWrapRef = useRef<HTMLDivElement>(null)
 
@@ -201,6 +212,12 @@ export const UserCalendarPageContent = () => {
       }
       const data = await res.json()
       setMe(data)
+      if (data.role === "ojt") {
+        fetch("/api/me/ojt-progress")
+          .then((r) => (r.ok ? r.json() : null))
+          .then((d) => { if (d) setOjtProgress(d) })
+          .catch(() => {})
+      }
     }
     loadMe()
   }, [])
@@ -424,6 +441,38 @@ export const UserCalendarPageContent = () => {
           {isLoading && (
             <span className="sr-only">Loading calendar data</span>
           )}
+          {me?.role === "ojt" && ojtProgress && (
+            <div className="mb-4 rounded-xl border border-violet-200/80 bg-violet-50/50 px-4 py-4 dark:border-violet-700/50 dark:bg-violet-950/20">
+              <p className="mb-2 text-xs font-medium uppercase tracking-wider text-violet-600 dark:text-violet-400">
+                Required Time Progress
+              </p>
+              <div className="flex items-end justify-between gap-2">
+                <p className="text-sm text-zinc-700 dark:text-zinc-300">
+                  <span className="text-xl font-bold tabular-nums text-zinc-900 dark:text-zinc-100">
+                    {ojtProgress.hoursCompleted}
+                  </span>
+                  {ojtProgress.requiredHours != null ? (
+                    <> / {ojtProgress.requiredHours} hrs</>
+                  ) : " hrs completed"}
+                </p>
+                {ojtProgress.percent != null && (
+                  <span className="text-lg font-semibold tabular-nums text-violet-600 dark:text-violet-400">
+                    {ojtProgress.percent}%
+                  </span>
+                )}
+              </div>
+              {ojtProgress.percent != null && (
+                <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-violet-200 dark:bg-violet-900/40">
+                  <div
+                    className="relative h-2 overflow-hidden rounded-full bg-violet-500 transition-all"
+                    style={{ width: `${ojtProgress.percent}%` }}
+                  >
+                    <div className="animate-shimmer absolute inset-0 w-1/2 bg-gradient-to-r from-transparent via-white/30 to-transparent" />
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
           <div className="rounded-xl border border-zinc-200/80 bg-zinc-50/50 px-4 py-4 dark:border-zinc-700/80 dark:bg-zinc-800/30">
             <div
               ref={hoursFilterWrapRef}
@@ -637,11 +686,13 @@ export const UserCalendarPageContent = () => {
                     ? "no-schedule"
                     : isFutureDay
                       ? derivedStatus
-                      : existingAttendance?.status === "absent" && !existingAttendance?.timeIn
-                        ? "absent"
-                        : existingAttendance?.status === "late"
-                          ? "late"
-                          : derivedStatus
+                      : existingAttendance?.approvalStatus === "pending" && !!existingAttendance?.timeIn
+                        ? "pending"
+                        : existingAttendance?.status === "absent" && !existingAttendance?.timeIn
+                          ? "absent"
+                          : existingAttendance?.status === "late"
+                            ? "late"
+                            : derivedStatus
                 const showActualAttendanceTimes =
                   !!existingAttendance?.timeIn && !isFutureDay
                 const dateKey = `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`

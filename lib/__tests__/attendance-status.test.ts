@@ -169,7 +169,7 @@ describe("deriveAttendanceStatus", () => {
     ).toBe("no-schedule")
   })
 
-  it("returns no-schedule for past date when no start date set", () => {
+  it("returns absent for past date when no start date set", () => {
     expect(
       deriveAttendanceStatus({
         hasSchedule: true,
@@ -182,10 +182,10 @@ describe("deriveAttendanceStatus", () => {
         tomorrowStr,
         startDateStr: null,
       })
-    ).toBe("no-schedule")
+    ).toBe("absent")
   })
 
-  it("returns no-schedule for today with no time-in", () => {
+  it("returns today for today with schedule and no time-in (user hasn't clocked in yet)", () => {
     expect(
       deriveAttendanceStatus({
         hasSchedule: true,
@@ -198,7 +198,7 @@ describe("deriveAttendanceStatus", () => {
         tomorrowStr,
         startDateStr: "2025-01-01",
       })
-    ).toBe("no-schedule")
+    ).toBe("today")
   })
 
   it("returns no-schedule for future dates (except tomorrow)", () => {

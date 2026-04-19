@@ -18,7 +18,7 @@ export async function GET() {
 
     const withStartDate = await supabase
       .from("users")
-      .select("id, user_id, full_name, email, contact_no, position, status, start_date, role")
+      .select("id, user_id, full_name, email, contact_no, position, status, start_date, role, required_hours, avatar_url")
       .order("created_at", { ascending: false })
 
     const msg = String(withStartDate.error?.message ?? "").toLowerCase()
@@ -27,7 +27,7 @@ export async function GET() {
     const result = useFallback
       ? await supabase
           .from("users")
-          .select("id, user_id, full_name, email, contact_no, position, status, role")
+          .select("id, user_id, full_name, email, contact_no, position, status, role, avatar_url")
           .order("created_at", { ascending: false })
       : withStartDate
 
@@ -46,6 +46,8 @@ export async function GET() {
       status: row.status as "active" | "inactive",
       startDate: (row.start_date as string | null) ?? null,
       role: ((row.role as string | null) ?? "employee") as "employee" | "admin" | "ojt",
+      requiredHours: (row.required_hours as number | null) ?? null,
+      avatarUrl: (row.avatar_url as string | null) ?? null,
     }))
 
     return NextResponse.json(users)
@@ -64,13 +66,14 @@ export async function POST(request: Request) {
     if (unauthorized) return unauthorized
 
     const body = await request.json()
-    const { fullName, email, contactNo, position, password, role } = body as {
+    const { fullName, email, contactNo, position, password, role, requiredHours } = body as {
       fullName?: string
       email?: string
       contactNo?: string
       position?: string
       password?: string
       role?: string
+      requiredHours?: number | null
     }
 
     if (!fullName?.trim() || !email?.trim()) {
@@ -162,13 +165,14 @@ export async function POST(request: Request) {
         position: position.trim(),
         status: "active",
         role: resolvedRole,
+        required_hours: resolvedRole === "ojt" && requiredHours != null ? Number(requiredHours) : null,
         ...(passwordHash ? { password_hash: passwordHash } : {}),
       }
       const clientToUse = authUserId ? admin : supabase
       const { data, error } = await clientToUse
         .from("users")
         .insert(insertPayload)
-        .select("id, user_id, full_name, email, contact_no, position, status, role")
+        .select("id, user_id, full_name, email, contact_no, position, status, role, required_hours")
         .single()
 
       if (!error) {
@@ -182,6 +186,7 @@ export async function POST(request: Request) {
           status: data.status as "active" | "inactive",
           startDate: null,
           role: (data.role ?? "employee") as "employee" | "admin" | "ojt",
+          requiredHours: (data as Record<string, unknown>).required_hours as number | null ?? null,
         }
         return NextResponse.json(user, { status: 201 })
       }

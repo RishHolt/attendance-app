@@ -3,11 +3,16 @@ import { getAdminUser, requireAdmin } from "../auth"
 
 type MockUser = { email: string } | null
 
-function createMockSupabase(user: MockUser) {
+function createMockSupabase(user: MockUser, role = "employee") {
   return {
     auth: {
       getUser: vi.fn().mockResolvedValue({ data: { user }, error: null }),
     },
+    from: vi.fn(() => ({
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      single: vi.fn().mockResolvedValue({ data: { role }, error: null }),
+    })),
   } as unknown as Awaited<ReturnType<typeof import("@/lib/supabase/server").createClient>>
 }
 
@@ -54,6 +59,25 @@ describe("getAdminUser", () => {
     const result = await getAdminUser(supabase)
     expect(result).toBe(null)
   })
+
+  it("returns user when DB role is 'admin' and email does not match LOCAL_ADMIN_EMAIL", async () => {
+    const supabase = createMockSupabase({ email: "dbadmin@example.com" }, "admin")
+    const result = await getAdminUser(supabase)
+    expect(result).not.toBe(null)
+    expect(result?.email).toBe("dbadmin@example.com")
+  })
+
+  it("returns null when DB role is 'employee'", async () => {
+    const supabase = createMockSupabase({ email: "user@example.com" }, "employee")
+    const result = await getAdminUser(supabase)
+    expect(result).toBe(null)
+  })
+
+  it("returns null when DB role is 'ojt'", async () => {
+    const supabase = createMockSupabase({ email: "intern@example.com" }, "ojt")
+    const result = await getAdminUser(supabase)
+    expect(result).toBe(null)
+  })
 })
 
 describe("requireAdmin", () => {
@@ -84,6 +108,24 @@ describe("requireAdmin", () => {
 
   it("returns 401 when user is null", async () => {
     const supabase = createMockSupabase(null)
+    const result = await requireAdmin(supabase)
+    expect(result?.status).toBe(401)
+  })
+
+  it("returns null (allows access) when user has role = 'admin' in DB", async () => {
+    const supabase = createMockSupabase({ email: "dbadmin@example.com" }, "admin")
+    const result = await requireAdmin(supabase)
+    expect(result).toBe(null)
+  })
+
+  it("returns 401 when user has role = 'employee' in DB", async () => {
+    const supabase = createMockSupabase({ email: "emp@example.com" }, "employee")
+    const result = await requireAdmin(supabase)
+    expect(result?.status).toBe(401)
+  })
+
+  it("returns 401 when user has role = 'ojt' in DB", async () => {
+    const supabase = createMockSupabase({ email: "ojt@example.com" }, "ojt")
     const result = await requireAdmin(supabase)
     expect(result?.status).toBe(401)
   })

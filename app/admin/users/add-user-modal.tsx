@@ -23,7 +23,8 @@ export const AddUserModal = ({ open, onClose, onSuccess }: AddUserModalProps) =>
   const [email, setEmail] = useState("")
   const [contactNo, setContactNo] = useState("")
   const [position, setPosition] = useState("")
-  const [role, setRole] = useState<"employee" | "admin" | "ojt">("employee")
+  const [role, setRole] = useState<"employee" | "admin" | "ojt" | "">((""))
+  const [requiredHours, setRequiredHours] = useState<string>("")
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -51,7 +52,8 @@ export const AddUserModal = ({ open, onClose, onSuccess }: AddUserModalProps) =>
     setEmail("")
     setContactNo("")
     setPosition("")
-    setRole("employee")
+    setRole("")
+    setRequiredHours("")
     setPassword("")
     setConfirmPassword("")
     setFieldErrors({})
@@ -83,6 +85,7 @@ export const AddUserModal = ({ open, onClose, onSuccess }: AddUserModalProps) =>
       password,
       confirmPassword,
     })
+    if (!role) validationErrors.role = "Please select a role"
     if (Object.keys(validationErrors).length > 0) {
       setFieldErrors(validationErrors)
       return
@@ -115,6 +118,7 @@ export const AddUserModal = ({ open, onClose, onSuccess }: AddUserModalProps) =>
           position,
           role,
           password,
+          requiredHours: role === "ojt" && requiredHours.trim() ? Number(requiredHours) : null,
         }),
       })
       const data = await res.json()
@@ -205,14 +209,29 @@ export const AddUserModal = ({ open, onClose, onSuccess }: AddUserModalProps) =>
           <select
             id="add-user-role"
             value={role}
-            onChange={(e) => setRole(e.target.value as "employee" | "admin" | "ojt")}
-            className="min-h-[44px] w-full rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-base text-zinc-900 transition-all duration-200 hover:border-zinc-300 focus:border-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-200 focus:ring-offset-0 dark:border-zinc-700 dark:bg-zinc-900/50 dark:text-zinc-100 dark:hover:border-zinc-600 dark:focus:border-zinc-500 dark:focus:ring-zinc-800"
+            onChange={(e) => { setRole(e.target.value as "employee" | "admin" | "ojt" | ""); clearFieldError("role") }}
+            className={`min-h-[44px] w-full rounded-xl border px-4 py-2.5 text-base transition-all duration-200 hover:border-zinc-300 focus:border-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-200 focus:ring-offset-0 dark:hover:border-zinc-600 dark:focus:border-zinc-500 dark:focus:ring-zinc-800 bg-white dark:bg-zinc-900/50 dark:text-zinc-100 ${!role ? "text-zinc-400 dark:text-zinc-500" : "text-zinc-900 dark:text-zinc-100"} ${fieldErrors.role ? "border-red-400 dark:border-red-500" : "border-zinc-200 dark:border-zinc-700"}`}
           >
+            <option value="" disabled>Select role</option>
             <option value="employee">Employee</option>
             <option value="ojt">OJT / Intern</option>
             <option value="admin">Admin</option>
           </select>
+          {fieldErrors.role && (
+            <p className="text-sm text-red-500">{fieldErrors.role}</p>
+          )}
         </div>
+        {role === "ojt" && (
+          <Input
+            label="Required hours"
+            placeholder="e.g. 486"
+            type="number"
+            min={1}
+            value={requiredHours}
+            onChange={(e) => setRequiredHours(e.target.value)}
+            helperText="Total OJT hours target (if required)"
+          />
+        )}
         <div className="flex flex-col gap-3">
           <div className="flex items-center justify-between">
             <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Password</span>

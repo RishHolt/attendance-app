@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { createAdminClient } from "@/lib/supabase/admin"
 import { requireAdmin } from "@/lib/auth"
 import { isFutureDate, resolveAbsentUserIds } from "@/lib/mark-absent"
 
@@ -20,8 +21,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ marked: 0 })
     }
 
-    // Fetch all active non-admin users
-    const { data: usersData, error: usersError } = await supabase
+    // Use admin client to bypass RLS — ensures status filter is authoritative
+    const admin = createAdminClient()
+    const { data: usersData, error: usersError } = await admin
       .from("users")
       .select("id")
       .eq("status", "active")
@@ -38,7 +40,7 @@ export async function POST(request: Request) {
 
     // Fetch schedules for active users on targetDate
     const dayOfWeek = new Date(targetDate + "T12:00:00").getDay()
-    const { data: schedulesData, error: schedError } = await supabase
+    const { data: schedulesData, error: schedError } = await admin
       .from("schedules")
       .select("user_id, day_of_week, custom_date, time_out")
       .in("user_id", allActiveIds)
@@ -49,7 +51,7 @@ export async function POST(request: Request) {
     }
 
     // Fetch existing attendance records for active users on targetDate
-    const { data: existingData, error: existingError } = await supabase
+    const { data: existingData, error: existingError } = await admin
       .from("attendances")
       .select("user_id")
       .in("user_id", allActiveIds)
@@ -90,7 +92,7 @@ export async function POST(request: Request) {
     }))
 
     // Upsert — ignore conflicts in case of a race condition
-    const { error: insertError } = await supabase
+    const { error: insertError } = await admin
       .from("attendances")
       .upsert(toInsert, { onConflict: "user_id,attendance_date", ignoreDuplicates: true })
 

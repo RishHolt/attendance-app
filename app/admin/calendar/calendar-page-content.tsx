@@ -22,6 +22,15 @@ type UserRow = {
   contactNo: string | null
   position: string | null
   startDate: string | null
+  status?: string | null
+  role?: "employee" | "admin" | "ojt"
+  requiredHours?: number | null
+}
+
+type OjtProgress = {
+  hoursCompleted: number
+  requiredHours: number | null
+  percent: number | null
 }
 
 type CalendarCell = {
@@ -163,6 +172,7 @@ export const CalendarPageContent = () => {
   const [draftFrom, setDraftFrom] = useState("")
   const [draftTo, setDraftTo] = useState("")
   const [hoursFilterOpen, setHoursFilterOpen] = useState(false)
+  const [ojtProgress, setOjtProgress] = useState<OjtProgress | null>(null)
   const hoursFilterWrapRef = useRef<HTMLDivElement>(null)
 
   const applyDefaultHoursRange = useCallback(() => {
@@ -219,6 +229,19 @@ export const CalendarPageContent = () => {
     }
     load()
   }, [])
+
+  useEffect(() => {
+    if (!selectedUserId) { setOjtProgress(null); return }
+    const user = users.find((u) => u.id === selectedUserId)
+    if (user?.role !== "ojt") { setOjtProgress(null); return }
+    fetch(`/api/users/ojt-progress?userId=${selectedUserId}`)
+      .then((r) => r.ok ? r.json() : [])
+      .then((list: Array<{ userId: string; hoursCompleted: number; requiredHours: number | null; percent: number | null }>) => {
+        const entry = list[0] ?? null
+        setOjtProgress(entry ? { hoursCompleted: entry.hoursCompleted, requiredHours: entry.requiredHours, percent: entry.percent } : null)
+      })
+      .catch(() => setOjtProgress(null))
+  }, [selectedUserId, users])
 
   const mergedAttendanceFetchRange = useMemo(() => {
     const cal = getCalendarVisibleRange(currentDate)
@@ -367,7 +390,7 @@ export const CalendarPageContent = () => {
         scheduleByDate.get(dateStr) ?? scheduleByDay.get(dayOfWeek)
       const hasSchedule = !!schedule
       const existingAttendance = attendanceByDate.get(dateStr)
-      const status =
+      const derivedStatus =
         selectedUserId && hasSchedule
           ? deriveAttendanceStatus({
               hasSchedule: true,
@@ -381,6 +404,7 @@ export const CalendarPageContent = () => {
               startDateStr: selectedUser?.startDate ?? null,
             })
           : "no-schedule"
+      const status = derivedStatus
       const statusLabel = LEGENDS.find((l) => l.status === status)?.label ?? "—"
       const timeIn = existingAttendance?.timeIn
         ? formatTime12(existingAttendance.timeIn)
@@ -634,6 +658,35 @@ export const CalendarPageContent = () => {
             )}
           </div>
         </div>
+
+        {ojtProgress && (
+          <div className="mb-6 rounded-xl border border-violet-200/80 bg-violet-50/50 px-4 py-4 dark:border-violet-700/60 dark:bg-violet-900/10">
+            <div className="space-y-3">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-xs font-medium uppercase tracking-wide text-violet-600 dark:text-violet-400">Required Time Progress</span>
+                <span className="font-semibold tabular-nums text-zinc-900 dark:text-zinc-100">
+                  {ojtProgress.hoursCompleted} {ojtProgress.requiredHours != null ? `/ ${ojtProgress.requiredHours} hrs` : "hrs completed"}
+                </span>
+              </div>
+              {ojtProgress.requiredHours != null && (
+                <>
+                  <div className="h-3 w-full overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-700">
+                    <div
+                      className="relative h-3 overflow-hidden rounded-full bg-violet-500 transition-all"
+                      style={{ width: `${ojtProgress.percent ?? 0}%` }}
+                    >
+                      <div className="animate-shimmer absolute inset-0 w-1/2 bg-gradient-to-r from-transparent via-white/30 to-transparent" />
+                    </div>
+                  </div>
+                  <p className="text-right text-xs tabular-nums text-zinc-500 dark:text-zinc-400">
+                    {ojtProgress.percent != null ? `${ojtProgress.percent}% complete` : ""}
+                  </p>
+                </>
+              )}
+            </div>
+          </div>
+        )}
+
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between lg:gap-6">
           <div className="flex w-full min-w-0 flex-1 flex-col gap-3 lg:flex-row lg:items-center lg:gap-6">
             <div className="flex w-full min-w-0 flex-1 flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">

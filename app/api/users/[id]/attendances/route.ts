@@ -127,10 +127,11 @@ export async function GET(
 
     const { data: userRow } = await supabase
       .from("users")
-      .select("start_date")
+      .select("start_date, status")
       .eq("id", userId)
       .maybeSingle()
     const startDate = (userRow as { start_date?: string | null } | null)?.start_date ?? null
+    const userStatus = (userRow as { status?: string | null } | null)?.status ?? "active"
 
     const scheduledDates = await getScheduledDatesInRange(supabase, userId, from, to)
     const { data: existingAttByDate } = await supabase
@@ -152,24 +153,27 @@ export async function GET(
       .is("time_in", null)
       .is("time_out", null)
 
-    const toInsert: { user_id: string; attendance_date: string; status: string }[] = []
-    for (const dateStr of scheduledDates) {
-      // Only backfill strictly past dates — never today, because the user may
-      // still clock in later and marking them absent at e.g. 4 AM is wrong.
-      if (dateStr >= todayStr) continue
-      if (startDate != null && dateStr < startDate) continue
-      if (existingDates.has(dateStr)) continue
-      toInsert.push({
-        user_id: userId,
-        attendance_date: dateStr,
-        status: "absent",
-      })
-    }
-    if (toInsert.length > 0) {
-      await supabase.from("attendances").upsert(toInsert, {
-        onConflict: "user_id,attendance_date",
-        ignoreDuplicates: true,
-      })
+    const toInsert: { user_id: string; attendance_date: string; status: string; approval_status: string }[] = []
+    if (userStatus === "active") {
+      for (const dateStr of scheduledDates) {
+        // Only backfill strictly past dates — never today, because the user may
+        // still clock in later and marking them absent at e.g. 4 AM is wrong.
+        if (dateStr >= todayStr) continue
+        if (startDate != null && dateStr < startDate) continue
+        if (existingDates.has(dateStr)) continue
+        toInsert.push({
+          user_id: userId,
+          attendance_date: dateStr,
+          status: "absent",
+          approval_status: "approved",
+        })
+      }
+      if (toInsert.length > 0) {
+        await supabase.from("attendances").upsert(toInsert, {
+          onConflict: "user_id,attendance_date",
+          ignoreDuplicates: true,
+        })
+      }
     }
 
     const selectFields = "id, user_id, attendance_date, status, time_in, time_out, approval_status, remarks"

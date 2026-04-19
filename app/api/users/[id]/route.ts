@@ -73,6 +73,10 @@ export async function PATCH(
       }
       updates.role = body.role
     }
+    if ((body as { requiredHours?: number | null }).requiredHours !== undefined) {
+      const rh = (body as { requiredHours?: number | null }).requiredHours
+      updates.required_hours = rh != null ? Number(rh) : null
+    }
 
     if (Object.keys(updates).length === 0 && !body.password?.trim()) {
       return NextResponse.json({ error: "No updates provided" }, { status: 400 })
@@ -141,7 +145,7 @@ export async function PATCH(
         .from("users")
         .update(updates)
         .eq("id", id)
-        .select("id, user_id, full_name, email, contact_no, position, status, start_date, role")
+        .select("id, user_id, full_name, email, contact_no, position, status, start_date, role, required_hours")
         .single()
       if (result.error) {
         if (result.error.code === "23505") {
@@ -159,7 +163,7 @@ export async function PATCH(
     } else {
       const result = await supabase
         .from("users")
-        .select("id, user_id, full_name, email, contact_no, position, status, start_date, role")
+        .select("id, user_id, full_name, email, contact_no, position, status, start_date, role, required_hours")
         .eq("id", id)
         .single()
       if (result.error) {
@@ -185,6 +189,7 @@ export async function PATCH(
       status: data.status as "active" | "inactive",
       startDate: data.start_date ?? null,
       role: (data.role ?? "employee") as "employee" | "admin" | "ojt",
+      requiredHours: (data as Record<string, unknown>).required_hours as number | null ?? null,
     }
 
     return NextResponse.json(user)

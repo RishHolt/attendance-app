@@ -2,15 +2,31 @@
 
 import Link from "next/link"
 import { useEffect, useRef, useState } from "react"
-import { User, Settings, LogOut, ChevronDown } from "lucide-react"
+import { User, LogOut, ChevronDown } from "lucide-react"
 
 type AccountDropdownProps = {
   name: string
 }
 
+const getInitials = (name: string) =>
+  name
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((n) => n[0].toUpperCase())
+    .join("")
+
 export const AccountDropdown = ({ name }: AccountDropdownProps) => {
   const [isOpen, setIsOpen] = useState(false)
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    fetch("/api/me")
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => { if (data?.avatarUrl) setAvatarUrl(data.avatarUrl) })
+      .catch(() => {})
+  }, [])
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -22,6 +38,29 @@ export const AccountDropdown = ({ name }: AccountDropdownProps) => {
     return () => document.removeEventListener("mousedown", handleClickOutside)
   }, [])
 
+  const initials = getInitials(name)
+
+  const avatar = () => {
+    if (avatarUrl) {
+      return (
+        <img
+          src={avatarUrl}
+          alt={name}
+          className="h-8 w-8 rounded-lg object-cover shrink-0"
+        />
+      )
+    }
+    return (
+      <div className="h-8 w-8 rounded-lg shrink-0 flex items-center justify-center bg-zinc-200 dark:bg-zinc-700">
+        {initials ? (
+          <span className="text-xs font-semibold text-zinc-600 dark:text-zinc-300">{initials}</span>
+        ) : (
+          <User className="h-4 w-4 text-zinc-600 dark:text-zinc-400" />
+        )}
+      </div>
+    )
+  }
+
   return (
     <div className="relative" ref={dropdownRef}>
       <button
@@ -32,9 +71,7 @@ export const AccountDropdown = ({ name }: AccountDropdownProps) => {
         aria-label={`Account menu for ${name || "Account"}`}
         className="flex items-center gap-2 rounded-xl border border-zinc-200/80 bg-white px-2 py-2 transition-all duration-200 hover:border-zinc-300 hover:bg-zinc-50 sm:px-3 dark:border-zinc-700/80 dark:bg-zinc-800/50 dark:hover:border-zinc-600 dark:hover:bg-zinc-800"
       >
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-zinc-200 dark:bg-zinc-700">
-          <User className="h-4 w-4 text-zinc-600 dark:text-zinc-400" />
-        </div>
+        {avatar()}
         <span className="hidden max-w-[120px] truncate text-sm font-medium text-zinc-900 sm:inline dark:text-zinc-100">
           {name || "Account"}
         </span>
@@ -57,15 +94,6 @@ export const AccountDropdown = ({ name }: AccountDropdownProps) => {
           >
             <User className="h-4 w-4 shrink-0 text-zinc-500" aria-hidden />
             Profile
-          </Link>
-          <Link
-            href="/admin/settings"
-            className="flex items-center gap-3 px-4 py-2.5 text-sm text-zinc-700 transition-colors hover:bg-zinc-50 dark:text-zinc-300 dark:hover:bg-zinc-800"
-            role="menuitem"
-            onClick={() => setIsOpen(false)}
-          >
-            <Settings className="h-4 w-4 shrink-0 text-zinc-500" aria-hidden />
-            Settings
           </Link>
           <div className="my-1 border-t border-zinc-200/80 dark:border-zinc-700/80" />
           <form action="/auth/signout" method="post">

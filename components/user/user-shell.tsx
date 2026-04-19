@@ -63,7 +63,7 @@ export const UserShell = ({ children, userName }: UserShellProps) => {
         : pathname.startsWith(item.href)
     return `flex items-center gap-3 rounded-xl px-4 py-3 text-base font-medium transition-all duration-200 min-h-[44px] ${
       isActive
-        ? "bg-zinc-900 text-white shadow-sm dark:bg-zinc-100 dark:text-zinc-900"
+        ? "bg-blue-600 text-white shadow-sm dark:bg-blue-600 dark:text-white"
         : "text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
     }`
   }
@@ -160,7 +160,7 @@ export const UserShell = ({ children, userName }: UserShellProps) => {
                     href={item.href}
                     className={`flex items-center gap-2 rounded-lg px-2 py-2.5 lg:px-3 text-sm font-medium transition-all duration-200 min-h-[44px] min-w-[44px] md:min-w-0 md:min-h-0 ${
                       isActive
-                        ? "bg-zinc-900 text-white shadow-sm dark:bg-zinc-100 dark:text-zinc-900"
+                        ? "bg-blue-600 text-white shadow-sm dark:bg-blue-600 dark:text-white"
                         : "text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
                     }`}
                   >
