@@ -391,8 +391,9 @@ export const CalendarPageContent = () => {
         scheduleByDate.get(dateStr) ?? scheduleByDay.get(dayOfWeek)
       const hasSchedule = !!schedule
       const existingAttendance = attendanceByDate.get(dateStr)
+      const isPostTermination = selectedUser?.endDate != null && dateStr > selectedUser.endDate
       const derivedStatus =
-        selectedUserId && hasSchedule
+        selectedUserId && hasSchedule && !isPostTermination
           ? deriveAttendanceStatus({
               hasSchedule: true,
               hasTimeIn: !!existingAttendance?.timeIn,
@@ -851,8 +852,9 @@ export const CalendarPageContent = () => {
                   scheduleByDate.get(dateStr) ?? scheduleByDay.get(dayOfWeek)
                 const hasSchedule = !!schedule
                 const existingAttendance = attendanceByDate.get(dateStr)
+                const isPostTermination = selectedUser?.endDate != null && dateStr > selectedUser.endDate
                 const derivedStatus: AttendanceStatus =
-                  selectedUserId && hasSchedule
+                  selectedUserId && hasSchedule && !isPostTermination
                     ? deriveAttendanceStatus({
                         hasSchedule: true,
                         hasTimeIn: !!existingAttendance?.timeIn,
@@ -867,7 +869,7 @@ export const CalendarPageContent = () => {
                     : "no-schedule"
                 const isFutureDay = dateStr > todayStr
                 const status: AttendanceStatus =
-                  !hasSchedule
+                  !hasSchedule || isPostTermination
                     ? "no-schedule"
                     : isFutureDay
                       ? derivedStatus

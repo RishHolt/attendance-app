@@ -30,11 +30,10 @@ export default function UserProfilePage() {
     const data = res.ok ? await res.json() : null
     setMe(data)
     if (data?.role === "ojt") {
-      fetch("/api/users/ojt-progress")
-        .then((r) => r.ok ? r.json() : [])
-        .then((list: { userId: string; hoursCompleted: number }[]) => {
-          const entry = list.find((p) => p.userId === data.id)
-          if (entry) setOjtHours(entry.hoursCompleted)
+      fetch("/api/me/ojt-progress")
+        .then((r) => r.ok ? r.json() : null)
+        .then((progress: { hoursCompleted: number } | null) => {
+          if (progress) setOjtHours(progress.hoursCompleted)
         })
         .catch(() => {})
     }

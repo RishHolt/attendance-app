@@ -18,6 +18,7 @@ type MeUser = {
   id: string
   fullName: string
   startDate: string | null
+  endDate: string | null
   status?: string
   role: "employee" | "admin" | "ojt"
   requiredHours: number | null
@@ -441,38 +442,6 @@ export const UserCalendarPageContent = () => {
           {isLoading && (
             <span className="sr-only">Loading calendar data</span>
           )}
-          {me?.role === "ojt" && ojtProgress && (
-            <div className="mb-4 rounded-xl border border-violet-200/80 bg-violet-50/50 px-4 py-4 dark:border-violet-700/50 dark:bg-violet-950/20">
-              <p className="mb-2 text-xs font-medium uppercase tracking-wider text-violet-600 dark:text-violet-400">
-                Required Time Progress
-              </p>
-              <div className="flex items-end justify-between gap-2">
-                <p className="text-sm text-zinc-700 dark:text-zinc-300">
-                  <span className="text-xl font-bold tabular-nums text-zinc-900 dark:text-zinc-100">
-                    {ojtProgress.hoursCompleted}
-                  </span>
-                  {ojtProgress.requiredHours != null ? (
-                    <> / {ojtProgress.requiredHours} hrs</>
-                  ) : " hrs completed"}
-                </p>
-                {ojtProgress.percent != null && (
-                  <span className="text-lg font-semibold tabular-nums text-violet-600 dark:text-violet-400">
-                    {ojtProgress.percent}%
-                  </span>
-                )}
-              </div>
-              {ojtProgress.percent != null && (
-                <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-violet-200 dark:bg-violet-900/40">
-                  <div
-                    className="relative h-2 overflow-hidden rounded-full bg-violet-500 transition-all"
-                    style={{ width: `${ojtProgress.percent}%` }}
-                  >
-                    <div className="animate-shimmer absolute inset-0 w-1/2 bg-gradient-to-r from-transparent via-white/30 to-transparent" />
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
           <div className="rounded-xl border border-zinc-200/80 bg-zinc-50/50 px-4 py-4 dark:border-zinc-700/80 dark:bg-zinc-800/30">
             <div
               ref={hoursFilterWrapRef}
@@ -587,6 +556,33 @@ export const UserCalendarPageContent = () => {
               )}
             </div>
           </div>
+          {me?.role === "ojt" && ojtProgress && (
+            <div className="mt-4 rounded-xl border border-violet-200/80 bg-violet-50/50 px-4 py-4 dark:border-violet-700/60 dark:bg-violet-900/10">
+              <div className="space-y-3">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-xs font-medium uppercase tracking-wide text-violet-600 dark:text-violet-400">Required Time Progress</span>
+                  <span className="font-semibold tabular-nums text-zinc-900 dark:text-zinc-100">
+                    {ojtProgress.hoursCompleted} {ojtProgress.requiredHours != null ? `/ ${ojtProgress.requiredHours} hrs` : "hrs completed"}
+                  </span>
+                </div>
+                {ojtProgress.requiredHours != null && (
+                  <>
+                    <div className="h-3 w-full overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-700">
+                      <div
+                        className="relative h-3 overflow-hidden rounded-full bg-violet-500 transition-all"
+                        style={{ width: `${ojtProgress.percent ?? 0}%` }}
+                      >
+                        <div className="animate-shimmer absolute inset-0 w-1/2 bg-gradient-to-r from-transparent via-white/30 to-transparent" />
+                      </div>
+                    </div>
+                    <p className="text-right text-xs tabular-nums text-zinc-500 dark:text-zinc-400">
+                      {ojtProgress.percent != null ? `${ojtProgress.percent}% complete` : ""}
+                    </p>
+                  </>
+                )}
+              </div>
+            </div>
+          )}
         </PageSection>
         <PageSection className="min-w-0">
           <div className="mb-6 flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
@@ -681,8 +677,9 @@ export const UserCalendarPageContent = () => {
                       })
                     : "no-schedule"
                 const isFutureDay = dateStr > todayStr
+                const isPostTermination = me.endDate != null && dateStr > me.endDate
                 const status: AttendanceStatus =
-                  !hasSchedule
+                  !hasSchedule || isPostTermination
                     ? "no-schedule"
                     : isFutureDay
                       ? derivedStatus

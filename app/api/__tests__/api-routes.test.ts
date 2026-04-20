@@ -170,6 +170,9 @@ describe("POST /api/users/:id/attendances (user clock-in)", () => {
       if (table === "schedules") {
         return makeChainable({ data: [], error: null })
       }
+      if (table === "users") {
+        return makeChainable({ data: { status: "active" }, error: null })
+      }
       return {
         select: vi.fn().mockReturnThis(),
         eq: vi.fn().mockReturnThis(),

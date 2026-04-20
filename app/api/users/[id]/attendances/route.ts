@@ -127,10 +127,11 @@ export async function GET(
 
     const { data: userRow } = await supabase
       .from("users")
-      .select("start_date, status")
+      .select("start_date, end_date, status")
       .eq("id", userId)
       .maybeSingle()
     const startDate = (userRow as { start_date?: string | null } | null)?.start_date ?? null
+    const endDate = (userRow as { end_date?: string | null } | null)?.end_date ?? null
     const userStatus = (userRow as { status?: string | null } | null)?.status ?? "active"
 
     const scheduledDates = await getScheduledDatesInRange(supabase, userId, from, to)
@@ -154,26 +155,27 @@ export async function GET(
       .is("time_out", null)
 
     const toInsert: { user_id: string; attendance_date: string; status: string; approval_status: string }[] = []
-    if (userStatus === "active") {
-      for (const dateStr of scheduledDates) {
-        // Only backfill strictly past dates — never today, because the user may
-        // still clock in later and marking them absent at e.g. 4 AM is wrong.
-        if (dateStr >= todayStr) continue
-        if (startDate != null && dateStr < startDate) continue
-        if (existingDates.has(dateStr)) continue
-        toInsert.push({
-          user_id: userId,
-          attendance_date: dateStr,
-          status: "absent",
-          approval_status: "approved",
-        })
-      }
-      if (toInsert.length > 0) {
-        await supabase.from("attendances").upsert(toInsert, {
-          onConflict: "user_id,attendance_date",
-          ignoreDuplicates: true,
-        })
-      }
+    for (const dateStr of scheduledDates) {
+      // Only backfill strictly past dates — never today.
+      if (dateStr >= todayStr) continue
+      if (startDate != null && dateStr < startDate) continue
+      // Don't backfill absent for dates after the user's end_date (post-termination).
+      if (endDate != null && dateStr > endDate) continue
+      // Don't backfill absent for inactive users with no end_date set.
+      if (userStatus !== "active" && endDate == null) continue
+      if (existingDates.has(dateStr)) continue
+      toInsert.push({
+        user_id: userId,
+        attendance_date: dateStr,
+        status: "absent",
+        approval_status: "approved",
+      })
+    }
+    if (toInsert.length > 0) {
+      await supabase.from("attendances").upsert(toInsert, {
+        onConflict: "user_id,attendance_date",
+        ignoreDuplicates: true,
+      })
     }
 
     const selectFields = "id, user_id, attendance_date, status, time_in, time_out, approval_status, remarks"
@@ -283,6 +285,16 @@ export async function POST(
     }
 
     const supabase = await createClient()
+
+    const { data: targetUser } = await supabase
+      .from("users")
+      .select("status")
+      .eq("id", userId)
+      .maybeSingle()
+    if ((targetUser as { status?: string } | null)?.status === "inactive") {
+      return NextResponse.json({ error: "User is inactive and cannot clock in or out" }, { status: 403 })
+    }
+
     const ti = timeIn?.trim() || null
     const to = timeOut?.trim() || null
     let derivedStatus: "present" | "late" | "absent" | "incomplete"

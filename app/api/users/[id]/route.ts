@@ -62,6 +62,11 @@ export async function PATCH(
         return NextResponse.json({ error: "Invalid status" }, { status: 400 })
       }
       updates.status = body.status
+      if (body.status === "inactive") {
+        updates.end_date = new Date().toISOString().split("T")[0]
+      } else if (body.status === "active") {
+        updates.end_date = null
+      }
     }
     if (body.startDate !== undefined) {
       updates.start_date = body.startDate?.trim() || null

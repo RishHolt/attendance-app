@@ -1,4 +1,5 @@
-import { app, BrowserWindow, screen, utilityProcess } from "electron"
+import { app, BrowserWindow, Menu, screen, utilityProcess } from "electron"
+Menu.setApplicationMenu(null)
 import type { UtilityProcess } from "electron"
 import path from "path"
 import net from "net"

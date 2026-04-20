@@ -16,6 +16,7 @@ type MeUser = {
   fullName: string
   email: string
   startDate?: string | null
+  status?: "active" | "inactive"
 }
 
 type AttendanceRow = {
@@ -549,7 +550,13 @@ export const AttendancePageContent = () => {
 
               {/* Actions */}
               <div className="flex shrink-0 flex-col gap-3 sm:flex-row sm:justify-end">
-                {todaySchedule ? (
+                {me?.status === "inactive" ? (
+                  <div className="rounded-xl border border-red-200/80 bg-red-50/80 px-4 py-3 dark:border-red-800/50 dark:bg-red-950/20">
+                    <p className="text-sm font-medium text-red-800 dark:text-red-300">
+                      Your account is inactive. Time in/out is disabled.
+                    </p>
+                  </div>
+                ) : todaySchedule ? (
                   <>
                     <Button
                       onClick={handleClockIn}
