@@ -1,6 +1,7 @@
 import type { Metadata } from "next"
 import { Poppins } from "next/font/google"
 import { ThemeProvider } from "@/components/theme-provider"
+import { SpeedInsights } from "@vercel/speed-insights/next"
 import "./globals.css"
 
 const poppins = Poppins({
@@ -39,6 +40,7 @@ export default function RootLayout({
       </head>
       <body className={`${poppins.variable} font-sans antialiased`}>
         <ThemeProvider>{children}</ThemeProvider>
+        <SpeedInsights />
       </body>
     </html>
   )
