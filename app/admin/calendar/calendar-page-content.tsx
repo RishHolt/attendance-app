@@ -662,10 +662,10 @@ export const CalendarPageContent = () => {
         </div>
 
         {ojtProgress && (
-          <div className="mb-6 rounded-xl border border-violet-200/80 bg-violet-50/50 px-4 py-4 dark:border-violet-700/60 dark:bg-violet-900/10">
+          <div className="mb-6 rounded-xl border border-blue-200/80 bg-blue-50/50 px-4 py-4 dark:border-blue-700/60 dark:bg-blue-900/10">
             <div className="space-y-3">
               <div className="flex items-center justify-between text-sm">
-                <span className="text-xs font-medium uppercase tracking-wide text-violet-600 dark:text-violet-400">Required Time Progress</span>
+                <span className="text-xs font-medium uppercase tracking-wide text-blue-600 dark:text-blue-400">Required Time Progress</span>
                 <span className="font-semibold tabular-nums text-zinc-900 dark:text-zinc-100">
                   {ojtProgress.hoursCompleted} {ojtProgress.requiredHours != null ? `/ ${ojtProgress.requiredHours} hrs` : "hrs completed"}
                 </span>
@@ -674,7 +674,7 @@ export const CalendarPageContent = () => {
                 <>
                   <div className="h-3 w-full overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-700">
                     <div
-                      className="relative h-3 overflow-hidden rounded-full bg-violet-500 transition-all"
+                      className={`relative h-3 overflow-hidden rounded-full transition-all ${ojtProgress.percent === 100 ? "bg-emerald-500" : "bg-blue-500"}`}
                       style={{ width: `${ojtProgress.percent ?? 0}%` }}
                     >
                       <div className="animate-shimmer absolute inset-0 w-1/2 bg-gradient-to-r from-transparent via-white/30 to-transparent" />

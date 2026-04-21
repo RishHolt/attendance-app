@@ -16,6 +16,7 @@ import { UserPageLayout } from "@/components/user/user-page-layout"
 import { PageSection } from "@/components/user/page-section"
 import { formatTime12 } from "@/lib/format-time"
 import { calcWorkMinutes, isLate } from "@/lib/time-calc"
+import { createClient } from "@/lib/supabase/client"
 
 type MeUser = {
   id: string
@@ -235,6 +236,7 @@ export const DashboardPageContent = () => {
     fetchData()
   }, [fetchData])
 
+
   const actionLinkClass =
     "inline-flex min-h-[48px] items-center justify-center gap-2 rounded-xl border-2 border-zinc-200 bg-white px-5 py-3 text-sm font-medium text-zinc-900 shadow-sm transition-all hover:border-zinc-300 hover:bg-zinc-50 hover:shadow dark:border-zinc-700 dark:bg-zinc-800/50 dark:text-zinc-100 dark:hover:border-zinc-600 dark:hover:bg-zinc-800"
 
@@ -308,7 +310,7 @@ export const DashboardPageContent = () => {
                     )}
                   </div>
                   {ojtProgress.percent != null && (
-                    <p className="text-2xl font-semibold tabular-nums text-violet-600 dark:text-violet-400">
+                    <p className={`text-2xl font-semibold tabular-nums ${ojtProgress.percent === 100 ? "text-emerald-600 dark:text-emerald-400" : "text-blue-600 dark:text-blue-400"}`}>
                       {ojtProgress.percent}%
                     </p>
                   )}
@@ -316,7 +318,7 @@ export const DashboardPageContent = () => {
                 {ojtProgress.percent != null && (
                   <div className="h-3 w-full overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-700">
                     <div
-                      className="relative h-3 overflow-hidden rounded-full bg-violet-500 transition-all"
+                      className={`relative h-3 overflow-hidden rounded-full transition-all ${ojtProgress.percent === 100 ? "bg-emerald-500" : "bg-blue-500"}`}
                       style={{ width: `${ojtProgress.percent}%` }}
                     >
                       <div className="animate-shimmer absolute inset-0 w-1/2 bg-gradient-to-r from-transparent via-white/30 to-transparent" />

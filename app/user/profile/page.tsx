@@ -141,7 +141,7 @@ export default function UserProfilePage() {
             </div>
             <div className="h-3 w-full overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-700">
               <div
-                className="relative h-3 overflow-hidden rounded-full bg-violet-500 transition-all"
+                className={`relative h-3 overflow-hidden rounded-full transition-all ${me.requiredHours > 0 && Math.min(100, Math.round(((ojtHours ?? 0) / me.requiredHours) * 100)) === 100 ? "bg-emerald-500" : "bg-blue-500"}`}
                 style={{
                   width: `${me.requiredHours > 0 ? Math.min(100, Math.round(((ojtHours ?? 0) / me.requiredHours) * 100)) : 0}%`,
                 }}

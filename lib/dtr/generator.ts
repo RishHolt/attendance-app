@@ -490,12 +490,18 @@ const replaceInChargeParagraphs = (body: Element, doc: Document) => {
       pPr.appendChild(jc)
     }
     jc.setAttributeNS(W, 'w:val', 'center')
-    appendArialTextRun(p, IN_CHARGE_NAME, doc, { szHalf: SZ_IN_CHARGE, bold: true })
+    const existingNameSpacing = getDirectChildren(pPr, 'spacing')[0]
+    if (existingNameSpacing) pPr.removeChild(existingNameSpacing)
+    const nameSpacing = doc.createElementNS(W, 'w:spacing')
+    nameSpacing.setAttributeNS(W, 'w:after', '0')
+    pPr.appendChild(nameSpacing)
+    appendArialTextRun(p, IN_CHARGE_NAME, doc, { szHalf: SZ_IN_CHARGE, bold: true, underline: true })
 
     // Build title paragraph (centered, not bold)
     const titleP = doc.createElementNS(W, 'w:p')
     const titlePPr = doc.createElementNS(W, 'w:pPr')
     const titleSpacing = doc.createElementNS(W, 'w:spacing')
+    titleSpacing.setAttributeNS(W, 'w:before', '0')
     titleSpacing.setAttributeNS(W, 'w:after', '0')
     titlePPr.appendChild(titleSpacing)
     const titleJc = doc.createElementNS(W, 'w:jc')
@@ -507,10 +513,9 @@ const replaceInChargeParagraphs = (body: Element, doc: Document) => {
     // Insert title after name paragraph
     parent.insertBefore(titleP, p.nextSibling)
 
-    // Move the underscore line from above the name to between name and title
+    // Remove the old underscore line paragraph (no longer needed — name is underlined)
     if (prevSibling) {
       parent.removeChild(prevSibling)
-      parent.insertBefore(prevSibling, titleP)
     }
   }
 }

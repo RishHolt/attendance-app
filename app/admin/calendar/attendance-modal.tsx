@@ -3,8 +3,6 @@
 import { useState, useEffect } from "react"
 import { Modal, Button, Input } from "@/components/ui"
 import { swal } from "@/lib/swal"
-import Swal from "sweetalert2"
-import { Trash2 } from "lucide-react"
 
 export type AttendanceRow = {
   id: string
@@ -49,7 +47,6 @@ export const AttendanceModal = ({
   const [timeOut, setTimeOut] = useState("")
   const isAbsent = status === "absent"
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [isDeleting, setIsDeleting] = useState(false)
 
   useEffect(() => {
     if (open) {
@@ -66,7 +63,7 @@ export const AttendanceModal = ({
   }, [open, mode, attendance])
 
   const handleClose = () => {
-    if (!isSubmitting && !isDeleting) onClose()
+    if (!isSubmitting) onClose()
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -125,38 +122,6 @@ export const AttendanceModal = ({
     }
   }
 
-  const handleDelete = async () => {
-    if (!attendance) return
-    const { isConfirmed } = await Swal.fire({
-      title: "Delete attendance?",
-      text: `This will remove the attendance record for ${dateLabel}.`,
-      icon: "warning",
-      showCancelButton: true,
-      confirmButtonColor: "#dc2626",
-      cancelButtonColor: "#71717a",
-      confirmButtonText: "Delete",
-    })
-    if (!isConfirmed) return
-    setIsDeleting(true)
-    try {
-      const res = await fetch(`/api/users/${userId}/attendances/${attendance.id}`, {
-        method: "DELETE",
-      })
-      if (!res.ok) {
-        const data = await res.json()
-        swal.error(data.error ?? "Failed to delete attendance")
-        return
-      }
-      await swal.success("Attendance deleted")
-      onClose()
-      onSuccess?.()
-    } catch {
-      swal.error("Something went wrong")
-    } finally {
-      setIsDeleting(false)
-    }
-  }
-
   return (
     <Modal
       open={open}
@@ -165,33 +130,19 @@ export const AttendanceModal = ({
       description={`${dateLabel}`}
       footer={
         <div className="flex items-center justify-between gap-3">
-          <div>
-            {mode === "edit" && attendance && (
-              <Button
-                type="button"
-                variant="destructive"
-                size="sm"
-                onClick={handleDelete}
-                disabled={isSubmitting}
-                leftIcon={<Trash2 className="h-4 w-4" />}
-              >
-                {isDeleting ? "Deleting…" : "Delete"}
-              </Button>
-            )}
-          </div>
           <div className="flex gap-3 ml-auto">
             <Button
               type="button"
               variant="secondary"
               onClick={handleClose}
-              disabled={isSubmitting || isDeleting}
+              disabled={isSubmitting}
             >
               Cancel
             </Button>
             <Button
               type="submit"
               form="attendance-form"
-              disabled={isSubmitting || isDeleting}
+              disabled={isSubmitting}
             >
               {isSubmitting ? "Saving…" : mode === "add" ? "Add" : "Save"}
             </Button>
