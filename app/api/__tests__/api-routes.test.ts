@@ -130,6 +130,7 @@ describe("POST /api/users/:id/attendances (user clock-in)", () => {
 
   it("allows creating attendance without schedule restriction (early time-in)", async () => {
     const { createClient } = await import("@/lib/supabase/server")
+    const { createAdminClient } = await import("@/lib/supabase/admin")
 
     const mockInsert = vi.fn()
     const mockSelect = vi.fn()
@@ -155,33 +156,32 @@ describe("POST /api/users/:id/attendances (user clock-in)", () => {
       const chain: Record<string, unknown> = {
         then: (resolve: (v: unknown) => unknown) => Promise.resolve(resolved).then(resolve),
       }
-      for (const m of ["select", "eq", "in", "gte", "lte", "order", "range", "single", "maybeSingle"]) {
+      for (const m of ["select", "eq", "neq", "in", "gte", "lte", "order", "range", "is", "single", "maybeSingle", "delete", "upsert"]) {
         chain[m] = vi.fn(() => chain)
       }
       return chain
     }
 
-    const from = vi.fn((table: string) => {
-      if (table === "attendances") {
-        return {
-          insert: mockInsert,
-        }
-      }
-      if (table === "schedules") {
-        return makeChainable({ data: [], error: null })
-      }
-      if (table === "users") {
-        return makeChainable({ data: { status: "active" }, error: null })
-      }
-      return {
-        select: vi.fn().mockReturnThis(),
-        eq: vi.fn().mockReturnThis(),
-      }
-    })
-
     vi.mocked(createClient).mockResolvedValue({
-      from,
+      auth: {
+        getUser: vi.fn().mockResolvedValue({
+          data: { user: { email: "admin@example.com" } },
+          error: null,
+        }),
+      },
+      from: vi.fn(() => makeChainable({ data: { role: "admin" }, error: null })),
     } as unknown as Awaited<ReturnType<typeof createClient>>)
+
+    vi.mocked(createAdminClient).mockReturnValue({
+      from: vi.fn((table: string) => {
+        if (table === "attendances") {
+          return { insert: mockInsert, delete: vi.fn(() => makeChainable({ data: null, error: null })), upsert: vi.fn(() => makeChainable({ data: null, error: null })) }
+        }
+        if (table === "schedules") return makeChainable({ data: [], error: null })
+        if (table === "users") return makeChainable({ data: { status: "active" }, error: null })
+        return makeChainable({ data: null, error: null })
+      }),
+    } as unknown as ReturnType<typeof createAdminClient>)
 
     const { POST } = await import("../users/[id]/attendances/route")
 

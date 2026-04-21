@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { createAdminClient } from "@/lib/supabase/admin"
 import { requireAdmin } from "@/lib/auth"
 import { formatTime24 } from "@/lib/format-time"
 import { deriveStatusFromTimes } from "@/lib/attendance-status"
@@ -51,6 +52,7 @@ export async function PATCH(
     const supabase = await createClient()
     const unauthorized = await requireAdmin(supabase)
     if (unauthorized) return unauthorized
+    const adminClient = createAdminClient()
 
     const body = await request.json()
     const { status } = body as { status?: "approved" | "rejected" }
@@ -61,7 +63,7 @@ export async function PATCH(
         { status: 400 }
       )
     }
-    const { data: correction } = await supabase
+    const { data: correction } = await adminClient
       .from("attendance_corrections")
       .select("id, attendance_id, user_id, requested_time_in, requested_time_out, status")
       .eq("id", id)
@@ -79,12 +81,12 @@ export async function PATCH(
 
     const { data: { user } } = await supabase.auth.getUser()
     const resolvedBy = user?.email
-      ? (await supabase.from("users").select("id").eq("email", user.email.toLowerCase()).maybeSingle())
+      ? (await adminClient.from("users").select("id").eq("email", user.email.toLowerCase()).maybeSingle())
           .data?.id ?? null
       : null
 
     if (status === "approved") {
-      const { data: att } = await supabase
+      const { data: att } = await adminClient
         .from("attendances")
         .select("id, attendance_date, time_in, time_out")
         .eq("id", correction.attendance_id)
@@ -145,7 +147,7 @@ export async function PATCH(
           ? formatTime24(att.time_out)
           : null
       const scheduledTimeIn = await getScheduledTimeInForDate(
-        supabase,
+        adminClient,
         correction.user_id,
         att.attendance_date
       )
@@ -168,7 +170,7 @@ export async function PATCH(
         attUpdates.approval_status = "approved"
       }
 
-      const { error: attError } = await supabase
+      const { error: attError } = await adminClient
         .from("attendances")
         .update(attUpdates)
         .eq("id", correction.attendance_id)
@@ -181,7 +183,7 @@ export async function PATCH(
       }
     }
 
-    const { data: updated, error } = await supabase
+    const { data: updated, error } = await adminClient
       .from("attendance_corrections")
       .update({
         status,

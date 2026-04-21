@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { createAdminClient } from "@/lib/supabase/admin"
+import { requireAdmin } from "@/lib/auth"
 import { formatTime24 } from "@/lib/format-time"
 import type { ScheduleRow } from "@/types"
 
@@ -157,6 +159,10 @@ export async function POST(
     }
 
     const supabase = await createClient()
+    const unauthorized = await requireAdmin(supabase)
+    if (unauthorized) return unauthorized
+
+    const adminClient = createAdminClient()
     const insertPayload = {
       user_id: userId,
       day_of_week: isCustom ? null : dayOfWeek,
@@ -168,7 +174,7 @@ export async function POST(
         typeof breakDuration === "number" && breakDuration >= 0 ? breakDuration : null,
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await adminClient
       .from("schedules")
       .insert(insertPayload)
       .select("id, user_id, day_of_week, custom_date, time_in, time_out, break_time, break_duration")
@@ -239,7 +245,11 @@ export async function PUT(
     }
 
     const supabase = await createClient()
-    const deleteRes = await supabase
+    const unauthorized = await requireAdmin(supabase)
+    if (unauthorized) return unauthorized
+
+    const adminClient = createAdminClient()
+    const deleteRes = await adminClient
       .from("schedules")
       .delete()
       .eq("user_id", userId)
@@ -267,7 +277,7 @@ export async function PUT(
               ? defaultPayload.breakDuration
               : null,
         }
-        await supabase.from("user_schedule_defaults").upsert(def, {
+        await adminClient.from("user_schedule_defaults").upsert(def, {
           onConflict: "user_id",
         })
       } catch {
@@ -336,7 +346,7 @@ export async function PUT(
       return NextResponse.json([])
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await adminClient
       .from("schedules")
       .insert(insertPayload)
       .select("id, user_id, day_of_week, custom_date, time_in, time_out, break_time, break_duration")

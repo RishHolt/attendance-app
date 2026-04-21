@@ -1,6 +1,10 @@
 import { calcWorkMinutes } from "@/lib/time-calc"
 
-type AttendanceRow = { time_in: string | null; time_out: string | null }
+type AttendanceRow = {
+  time_in: string | null
+  time_out: string | null
+  approval_status?: string | null
+}
 
 type AttendanceWithDate = AttendanceRow & { attendance_date: string }
 
@@ -30,6 +34,7 @@ export function calcOjtHoursWithSchedules(
   let totalMinutes = 0
   for (const a of attendances) {
     if (!a.time_in || !a.time_out) continue
+    if (a.approval_status && a.approval_status !== "approved") continue
     const dateStr = a.attendance_date
     const dayOfWeek = new Date(dateStr + "T00:00:00").getDay()
     const schedule = scheduleByDate.get(dateStr) ?? scheduleByDay.get(dayOfWeek)

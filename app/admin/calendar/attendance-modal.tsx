@@ -47,6 +47,7 @@ export const AttendanceModal = ({
   const [status, setStatus] = useState<"present" | "late" | "absent" | "incomplete">("present")
   const [timeIn, setTimeIn] = useState("")
   const [timeOut, setTimeOut] = useState("")
+  const isAbsent = status === "absent"
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
 
@@ -206,7 +207,14 @@ export const AttendanceModal = ({
             </label>
             <select
               value={status}
-              onChange={(e) => setStatus(e.target.value as "present" | "late" | "absent")}
+              onChange={(e) => {
+                const next = e.target.value as "present" | "late" | "absent" | "incomplete"
+                setStatus(next)
+                if (next === "absent") {
+                  setTimeIn("")
+                  setTimeOut("")
+                }
+              }}
               className="min-h-[44px] w-full rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-base text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-400 dark:border-zinc-700 dark:bg-zinc-900/50 dark:text-zinc-100"
             >
               {STATUS_OPTIONS.map((opt) => (
@@ -217,20 +225,22 @@ export const AttendanceModal = ({
             </select>
           </div>
         )}
-        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-          <Input
-            type="time"
-            label="Time in"
-            value={timeIn}
-            onChange={(e) => setTimeIn(e.target.value)}
-          />
-          <Input
-            type="time"
-            label="Time out"
-            value={timeOut}
-            onChange={(e) => setTimeOut(e.target.value)}
-          />
-        </div>
+        {!isAbsent && (
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+            <Input
+              type="time"
+              label="Time in"
+              value={timeIn}
+              onChange={(e) => setTimeIn(e.target.value)}
+            />
+            <Input
+              type="time"
+              label="Time out"
+              value={timeOut}
+              onChange={(e) => setTimeOut(e.target.value)}
+            />
+          </div>
+        )}
       </form>
     </Modal>
   )

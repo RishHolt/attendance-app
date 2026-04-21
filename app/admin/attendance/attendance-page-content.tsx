@@ -87,6 +87,9 @@ export const AttendancePageContent = () => {
   const getAttendanceSelectionKey = (row: Pick<AdminAttendanceRow, "id" | "userId">) =>
     `${row.userId}:${row.id}`
 
+  const isAttendanceSelectable = (r: AdminAttendanceRow) =>
+    tab !== "pending" || !!r.timeOut
+
   const loadData = useCallback(async () => {
     setIsLoading(true)
     if (tab === "corrections") {
@@ -214,8 +217,7 @@ export const AttendancePageContent = () => {
   }
 
   const toggleAllAttendances = () => {
-    const selectableAttendances =
-      tab === "pending" ? attendances.filter((r) => !!r.timeOut) : attendances
+    const selectableAttendances = attendances.filter(isAttendanceSelectable)
 
     if (selectedAttendances.size === selectableAttendances.length) {
       setSelectedAttendances(new Set())
@@ -235,7 +237,7 @@ export const AttendancePageContent = () => {
   const shouldShowBulkActions = tab === "pending" || tab === "corrections"
   const isPendingTab = tab === "pending"
   const selectedCount = isPendingTab ? selectedAttendances.size : selectedCorrections.size
-  const totalCount = isPendingTab ? attendances.filter((r) => !!r.timeOut).length : corrections.length
+  const totalCount = isPendingTab ? attendances.filter(isAttendanceSelectable).length : corrections.length
   const allSelected = selectedCount === totalCount && totalCount > 0
 
   const handleApprove = async (row: AdminAttendanceRow) => {
@@ -837,7 +839,7 @@ export const AttendancePageContent = () => {
                             <button
                               type="button"
                               onClick={() => toggleAttendanceSelection(getAttendanceSelectionKey(row))}
-                              disabled={tab === "pending" && !row.timeOut}
+                              disabled={!isAttendanceSelectable(row)}
                               className="flex items-center justify-center disabled:cursor-not-allowed disabled:opacity-40"
                               aria-label={
                                 tab === "pending" && !row.timeOut

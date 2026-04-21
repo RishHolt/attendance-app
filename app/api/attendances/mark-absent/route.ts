@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { requireAdmin } from "@/lib/auth"
 import { isFutureDate, resolveAbsentUserIds } from "@/lib/mark-absent"
+import { PH_OFFSET_MS } from "@/lib/constants"
 
 export async function POST(request: Request) {
   try {
@@ -65,7 +66,6 @@ export async function POST(request: Request) {
     // For past dates: no time restriction (null).
     // Schedule times are stored in Philippine time (UTC+8), so offset now accordingly.
     const now = new Date()
-    const PH_OFFSET_MS = 8 * 60 * 60 * 1000
     const nowPH = new Date(now.getTime() + PH_OFFSET_MS)
     const nowTime =
       targetDate === todayISO

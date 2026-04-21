@@ -69,11 +69,16 @@ export function resolveAbsentUserIds(
     }
   }
 
+  const toMinutes = (t: string) => {
+    const [h, m] = t.split(":").map(Number)
+    return (h ?? 0) * 60 + (m ?? 0)
+  }
+
   const result: string[] = []
   for (const [userId, timeOut] of latestTimeOut) {
     if (alreadyRecorded.has(userId)) continue
     // For today: only mark absent after their shift has ended
-    if (nowTime !== null && nowTime < timeOut) continue
+    if (nowTime !== null && toMinutes(nowTime) < toMinutes(timeOut)) continue
     result.push(userId)
   }
   return result

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
+import { requireAdmin } from "@/lib/auth"
 import { formatTime24 } from "@/lib/format-time"
 import { deriveStatusFromTimes } from "@/lib/attendance-status"
 
@@ -51,10 +52,15 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string; attendanceId: string }> }
 ) {
   try {
-    const { attendanceId } = await params
+    const { id: userId, attendanceId } = await params
     if (!attendanceId) {
       return NextResponse.json({ error: "Attendance ID required" }, { status: 400 })
     }
+
+    const supabase = await createClient()
+    const unauthorized = await requireAdmin(supabase)
+    if (unauthorized) return unauthorized
+    const adminClient = createAdminClient()
 
     const body = await request.json()
     const { status, timeIn, timeOut, approvalStatus, remarks } = body as {
@@ -65,7 +71,6 @@ export async function PATCH(
       remarks?: string | null
     }
 
-    const supabase = await createClient()
     const updates: Record<string, unknown> = {}
     if (timeIn !== undefined) updates.time_in = timeIn?.trim() || null
     if (timeOut !== undefined) updates.time_out = timeOut?.trim() || null
@@ -74,6 +79,10 @@ export async function PATCH(
         return NextResponse.json({ error: "Invalid status" }, { status: 400 })
       }
       updates.status = status
+      if (status === "absent") {
+        updates.time_in = null
+        updates.time_out = null
+      }
     }
     if (approvalStatus !== undefined) {
       if (!["pending", "approved", "denied"].includes(approvalStatus)) {
@@ -93,10 +102,11 @@ export async function PATCH(
     }
 
     if (updates.approval_status === "approved") {
-      const { data: existing } = await supabase
+      const { data: existing } = await adminClient
         .from("attendances")
         .select("time_in, time_out")
         .eq("id", attendanceId)
+        .eq("user_id", userId)
         .single()
       if (!existing?.time_in || !existing?.time_out) {
         return NextResponse.json(
@@ -110,10 +120,11 @@ export async function PATCH(
       (updates.time_in !== undefined || updates.time_out !== undefined) &&
       updates.approval_status !== "denied"
     ) {
-      const { data: existing } = await supabase
+      const { data: existing } = await adminClient
         .from("attendances")
         .select("user_id, attendance_date, time_in, time_out")
         .eq("id", attendanceId)
+        .eq("user_id", userId)
         .single()
       if (existing?.user_id && existing?.attendance_date) {
         const mergedTimeIn =
@@ -128,7 +139,7 @@ export async function PATCH(
         const to = mergedTimeOut ? formatTime24(mergedTimeOut) : null
         if (ti || to) {
           const scheduledTimeIn = await getScheduledTimeInForDate(
-            supabase,
+            adminClient,
             existing.user_id,
             existing.attendance_date
           )
@@ -142,10 +153,11 @@ export async function PATCH(
     }
 
     const selectFields = "id, user_id, attendance_date, status, time_in, time_out, approval_status, remarks"
-    const { data, error } = await supabase
+    const { data, error } = await adminClient
       .from("attendances")
       .update(updates)
       .eq("id", attendanceId)
+      .eq("user_id", userId)
       .select(selectFields)
       .single()
 
@@ -176,46 +188,43 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string; attendanceId: string }> }
 ) {
   try {
-    const { attendanceId } = await params
+    const { id: userId, attendanceId } = await params
     if (!attendanceId) {
       return NextResponse.json({ error: "Attendance ID required" }, { status: 400 })
     }
 
     const supabase = await createClient()
+    const unauthorized = await requireAdmin(supabase)
+    if (unauthorized) return unauthorized
+    const adminClient = createAdminClient()
 
-    // First check if the record exists (using user client)
-    const { data: existing, error: selectError } = await supabase
+    const { data: existing, error: selectError } = await adminClient
       .from("attendances")
       .select("id")
       .eq("id", attendanceId)
+      .eq("user_id", userId)
       .single()
 
-    if (selectError && selectError.code !== 'PGRST116') { // PGRST116 is "not found"
-      console.error("Error checking if attendance exists:", selectError)
+    if (selectError && selectError.code !== "PGRST116") {
       return NextResponse.json({ error: selectError.message }, { status: 500 })
     }
 
-    const recordExists = !!existing
-    console.log(`DELETE attendance ${attendanceId}: record exists = ${recordExists}`)
-
-    if (!recordExists) {
-      console.log(`DELETE attendance ${attendanceId}: record already deleted`)
+    if (!existing) {
       return new NextResponse(null, { status: 204 })
     }
 
-    // Use admin client for deletion to bypass RLS
-    const adminSupabase = createAdminClient()
-    const { error } = await adminSupabase.from("attendances").delete().eq("id", attendanceId)
+    const { error } = await adminClient
+      .from("attendances")
+      .delete()
+      .eq("id", attendanceId)
+      .eq("user_id", userId)
 
     if (error) {
-      console.error("Error deleting attendance:", error)
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    console.log(`DELETE attendance ${attendanceId}: deletion successful`)
     return new NextResponse(null, { status: 204 })
   } catch (err) {
-    console.error("Unexpected error in DELETE attendance:", err)
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Failed to delete attendance" },
       { status: 500 }

@@ -5,7 +5,7 @@ export type AdminAttendanceRow = {
   fullName: string
   date: string
   status: "present" | "late" | "absent" | "incomplete"
-  approvalStatus: "pending" | "approved" | "denied"
+  approvalStatus: "pending" | "approved" | "denied" | null
   timeIn: string | null
   timeOut: string | null
   remarks: string | null

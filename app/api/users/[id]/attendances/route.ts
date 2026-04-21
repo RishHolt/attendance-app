@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { createAdminClient } from "@/lib/supabase/admin"
+import { requireAdmin } from "@/lib/auth"
 import { formatTime24 } from "@/lib/format-time"
 import { deriveStatusFromTimes } from "@/lib/attendance-status"
 
@@ -145,7 +147,8 @@ export async function GET(
 
     // Clean up any phantom absent records that were created for today
     // before this fix (no time_in, no time_out — user never actually clocked in).
-    await supabase
+    const cleanupAdminClient = createAdminClient()
+    await cleanupAdminClient
       .from("attendances")
       .delete()
       .eq("user_id", userId)
@@ -172,7 +175,8 @@ export async function GET(
       })
     }
     if (toInsert.length > 0) {
-      await supabase.from("attendances").upsert(toInsert, {
+      const adminClient = createAdminClient()
+      await adminClient.from("attendances").upsert(toInsert, {
         onConflict: "user_id,attendance_date",
         ignoreDuplicates: true,
       })
@@ -285,8 +289,11 @@ export async function POST(
     }
 
     const supabase = await createClient()
+    const unauthorized = await requireAdmin(supabase)
+    if (unauthorized) return unauthorized
+    const adminClient = createAdminClient()
 
-    const { data: targetUser } = await supabase
+    const { data: targetUser } = await adminClient
       .from("users")
       .select("status")
       .eq("id", userId)
@@ -299,7 +306,7 @@ export async function POST(
     const to = timeOut?.trim() || null
     let derivedStatus: "present" | "late" | "absent" | "incomplete"
     if (ti || to) {
-      const scheduledTimeIn = await getScheduledTimeInForDate(supabase, userId, date.trim())
+      const scheduledTimeIn = await getScheduledTimeInForDate(adminClient, userId, date.trim())
       derivedStatus = deriveStatusFromTimes({
         timeIn: ti,
         timeOut: to,
@@ -323,7 +330,7 @@ export async function POST(
     if (ti) insertPayload.time_in = ti
     if (to) insertPayload.time_out = to
 
-    const { data, error } = await supabase
+    const { data, error } = await adminClient
       .from("attendances")
       .insert(insertPayload)
       .select("id, user_id, attendance_date, status, time_in, time_out")

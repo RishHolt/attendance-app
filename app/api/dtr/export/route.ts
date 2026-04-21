@@ -3,6 +3,8 @@ export const runtime = 'nodejs'
 import { NextRequest, NextResponse } from 'next/server'
 import { generateDTR } from '@/lib/dtr/generator'
 import { createClient } from '@/lib/supabase/server'
+import { requireAdmin } from '@/lib/auth'
+import { PH_LOCALE } from '@/lib/constants'
 import { formatTime12, formatTime12NoAmPm } from '@/lib/format-time'
 import { calcWorkMinutes } from '@/lib/time-calc'
 import { buildDtrExportFileBaseName } from '@/lib/dtr/export-filename'
@@ -43,6 +45,8 @@ export async function POST(req: NextRequest) {
     }
 
     const supabase = await createClient()
+    const unauthorized = await requireAdmin(supabase)
+    if (unauthorized) return unauthorized
 
     const { data: user, error: userError } = await supabase
       .from('users')
@@ -98,7 +102,7 @@ export async function POST(req: NextRequest) {
       ])
     )
 
-    const monthLabel = startDate.toLocaleString('en-PH', {
+    const monthLabel = startDate.toLocaleString(PH_LOCALE, {
       month: 'long',
       year: 'numeric',
     })
