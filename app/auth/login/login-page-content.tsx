@@ -10,17 +10,27 @@ import {
 } from "@/components/ui"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { BrandLogo } from "@/components/brand-logo"
+import { StarsBackground } from "@/components/animate-ui/components/backgrounds/stars"
+import { useTheme } from "@/components/theme-provider"
 import { LoginForm } from "./login-form"
 
 export const LoginPageContent = () => {
+  const { theme } = useTheme()
+  const isDark = theme === "dark"
+
   return (
     <div className="relative flex min-h-dvh items-center justify-center overflow-hidden px-4 py-8 sm:px-6 sm:py-16">
-      <div className="absolute inset-0 bg-zinc-50 dark:bg-zinc-950" />
-      <div className="absolute inset-0 bg-[linear-gradient(to_right,#e4e4e7_1px,transparent_1px),linear-gradient(to_bottom,#e4e4e7_1px,transparent_1px)] bg-[size:3.5rem_3.5rem] opacity-50 dark:bg-[linear-gradient(to_right,#27272a_1px,transparent_1px),linear-gradient(to_bottom,#27272a_1px,transparent_1px)] dark:opacity-40" />
-      <div className="absolute -top-48 -right-48 h-96 w-96 rounded-full bg-zinc-200/70 blur-3xl dark:bg-zinc-800/50" />
-      <div className="absolute -bottom-48 -left-48 h-96 w-96 rounded-full bg-zinc-200/70 blur-3xl dark:bg-zinc-800/50" />
+      <StarsBackground
+        starColor={isDark ? "#FFF" : "#000"}
+        pointerEvents={false}
+        className={
+          isDark
+            ? "absolute inset-0 bg-[radial-gradient(ellipse_at_bottom,_#262626_0%,_#000_100%)]"
+            : "absolute inset-0 bg-[radial-gradient(ellipse_at_bottom,_#f5f5f5_0%,_#fff_100%)]"
+        }
+      />
 
-      <div className="absolute right-4 top-4">
+      <div className="absolute right-4 top-4 z-20">
         <motion.div
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}

@@ -6,7 +6,21 @@
       "Bash(npm install *)",
       "mcp__supabase__apply_migration",
       "Bash(npx tsx *)",
-      "Bash(node -e ' *)"
+      "Bash(node -e ' *)",
+      "Bash(gh api *)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:animate-ui.com)",
+      "WebFetch(domain:github.com)",
+      "Bash(curl -s -L -o /tmp/stars.tsx -w \"%{http_code}\" \"https://raw.githubusercontent.com/imskyleen/animate-ui/main/registry/components/backgrounds/stars.tsx\")",
+      "Bash(curl -s -L -o /tmp/stars2.tsx -w \"%{http_code}\" \"https://animate-ui.com/r/backgrounds-stars.json\")",
+      "Bash(curl -s \"https://api.github.com/repos/imskyleen/animate-ui/contents/registry/components/backgrounds\")",
+      "Bash(curl -s \"https://api.github.com/repos/imskyleen/animate-ui/git/trees/main?recursive=1\")",
+      "Bash(curl -s \"https://raw.githubusercontent.com/imskyleen/animate-ui/main/apps/www/public/r/components-backgrounds-stars.json\")",
+      "Bash(npx shadcn@latest add @animate-ui/components-backgrounds-stars --yes)",
+      "Bash(yes)",
+      "Bash(npx shadcn@latest add @animate-ui/components-backgrounds-stars)",
+      "Bash(git checkout *)",
+      "Bash(npm uninstall *)"
     ]
   }
 }

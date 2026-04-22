@@ -8,17 +8,10 @@ import { Input } from "@/components/ui/input"
 import { PasswordInput } from "@/components/ui/password-input"
 import { swal } from "@/lib/swal"
 import {
-  validateFullName,
-  validateEmail,
-  validateContactNo,
-  validatePassword,
-  validatePosition,
   validateUserForm,
+  validatePassword,
 } from "@/lib/user-form-validation"
 import { checkUserAvailability } from "@/lib/check-user-availability"
-import { useDebounce } from "@/lib/use-debounce"
-
-const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 type UserRow = {
   id: string
@@ -58,9 +51,6 @@ export const EditUserModal = ({
   const [confirmPassword, setConfirmPassword] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
-  const [availabilityErrors, setAvailabilityErrors] = useState<Record<string, string>>({})
-  const [serverErrorField, setServerErrorField] = useState<"email" | "contactNo" | "password" | null>(null)
-  const [serverErrorMessage, setServerErrorMessage] = useState("")
 
   useEffect(() => {
     if (!user || user.role !== "ojt") { setOjtProgress(null); return }
@@ -72,9 +62,6 @@ export const EditUserModal = ({
       })
       .catch(() => {})
   }, [user])
-
-  const debouncedEmail = useDebounce(email, 400)
-  const debouncedContactNo = useDebounce(contactNo, 400)
 
   useEffect(() => {
     if (user) {
@@ -88,135 +75,17 @@ export const EditUserModal = ({
       setPassword("")
       setConfirmPassword("")
       setFieldErrors({})
-      setAvailabilityErrors({})
-      setServerErrorField(null)
-      setServerErrorMessage("")
     }
   }, [user])
 
-  const getErrorField = (message: string): "email" | "contactNo" | "password" | null => {
-    const lower = message.toLowerCase()
-    if (lower.includes("email")) return "email"
-    if (lower.includes("contact")) return "contactNo"
-    if (lower.includes("password")) return "password"
-    return null
-  }
-
-  const getFieldError = (field: "fullName" | "email" | "contactNo" | "position" | "password" | "confirmPassword") => {
-    if (serverErrorField === field) return serverErrorMessage
-    if (availabilityErrors[field]) return availabilityErrors[field]
-    return fieldErrors[field] ?? undefined
-  }
-
-  const validateField = (
-    field: "fullName" | "email" | "contactNo" | "position" | "password" | "confirmPassword",
-    value: string,
-    confirmValue?: string
-  ) => {
-    let err: string | null = null
-    if (field === "fullName") err = validateFullName(value)
-    else if (field === "email") err = validateEmail(value)
-    else if (field === "contactNo") err = validateContactNo(value)
-    else if (field === "position") err = validatePosition(value)
-    else if (field === "password") err = value ? validatePassword(value) : null
-    else if (field === "confirmPassword")
-      err = value !== (confirmValue ?? password) ? "Passwords do not match" : null
+  const clearFieldError = (field: string) => {
     setFieldErrors((prev) => {
+      if (!prev[field]) return prev
       const next = { ...prev }
-      if (err) next[field] = err
-      else delete next[field]
+      delete next[field]
       return next
     })
   }
-
-  useEffect(() => {
-    if (!user) return
-    // Skip if debounce hasn't caught up to current email state yet
-    if (debouncedEmail.trim() !== email.trim()) return
-    if (debouncedEmail.trim() === (user.email ?? "").trim()) {
-      setAvailabilityErrors((prev) => {
-        const next = { ...prev }
-        delete next.email
-        return next
-      })
-      return
-    }
-    const check = async (field: "email" | "contactNo", value: string) => {
-      const trimmed = value.trim()
-      if (!trimmed) {
-        setAvailabilityErrors((prev) => {
-          const next = { ...prev }
-          delete next[field]
-          return next
-        })
-        return
-      }
-      if (field === "email" && !EMAIL_REGEX.test(trimmed)) return
-      try {
-        const { available } = await checkUserAvailability(field, value, user.id)
-        setAvailabilityErrors((prev) => {
-          const next = { ...prev }
-          if (available) delete next[field]
-          else {
-            if (field === "email") next[field] = "Email already exists"
-            else next[field] = "Contact no already exists"
-          }
-          return next
-        })
-      } catch {
-        setAvailabilityErrors((prev) => {
-          const next = { ...prev }
-          delete next[field]
-          return next
-        })
-      }
-    }
-    check("email", debouncedEmail)
-  }, [debouncedEmail, email, user])
-
-  useEffect(() => {
-    if (!user) return
-    // Skip if debounce hasn't caught up to current contactNo state yet
-    if (debouncedContactNo.trim() !== contactNo.trim()) return
-    const originalContact = (user.contactNo ?? "").trim()
-    if (debouncedContactNo.trim() === originalContact) {
-      setAvailabilityErrors((prev) => {
-        const next = { ...prev }
-        delete next.contactNo
-        return next
-      })
-      return
-    }
-    const check = async (field: "contactNo", value: string) => {
-      const trimmed = value.trim()
-      if (!trimmed) {
-        setAvailabilityErrors((prev) => {
-          const next = { ...prev }
-          delete next[field]
-          return next
-        })
-        return
-      }
-      const digits = trimmed.replace(/\D/g, "")
-      if (digits.length !== 11) return
-      try {
-        const { available } = await checkUserAvailability(field, value, user.id)
-        setAvailabilityErrors((prev) => {
-          const next = { ...prev }
-          if (available) delete next[field]
-          else next[field] = "Contact no already exists"
-          return next
-        })
-      } catch {
-        setAvailabilityErrors((prev) => {
-          const next = { ...prev }
-          delete next[field]
-          return next
-        })
-      }
-    }
-    check("contactNo", debouncedContactNo)
-  }, [debouncedContactNo, contactNo, user])
 
   const generatePassword = () => {
     const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%"
@@ -267,10 +136,33 @@ export const EditUserModal = ({
       setFieldErrors(validationErrors)
       return
     }
-    if (Object.keys(availabilityErrors).length > 0) return
+    // Check availability on submit
+    const availErrors: Record<string, string> = {}
+    try {
+      const checks: Promise<void>[] = []
+      if (email.trim() !== user.email.trim()) {
+        checks.push(
+          checkUserAvailability("email", email, user.id).then(({ available }) => {
+            if (!available) availErrors.email = "Email already exists"
+          })
+        )
+      }
+      if (contactNo.trim() !== (user.contactNo ?? "").trim()) {
+        checks.push(
+          checkUserAvailability("contactNo", contactNo, user.id).then(({ available }) => {
+            if (!available) availErrors.contactNo = "Contact no already exists"
+          })
+        )
+      }
+      await Promise.all(checks)
+    } catch {
+      // proceed; server will catch duplicates
+    }
+    if (Object.keys(availErrors).length > 0) {
+      setFieldErrors((prev) => ({ ...prev, ...availErrors }))
+      return
+    }
     setIsSubmitting(true)
-    setServerErrorField(null)
-    setServerErrorMessage("")
     try {
       const res = await fetch(`/api/users/${user.id}`, {
         method: "PATCH",
@@ -288,8 +180,6 @@ export const EditUserModal = ({
       const data = await res.json()
       if (!res.ok) {
         const errMsg = data.error ?? "Failed to update user"
-        setServerErrorField(getErrorField(errMsg))
-        setServerErrorMessage(errMsg)
         swal.error(errMsg)
         return
       }
@@ -341,27 +231,18 @@ export const EditUserModal = ({
             label="Full name"
             placeholder="Jane Doe"
             value={fullName}
-            onChange={(e) => {
-              setFullName(e.target.value)
-              validateField("fullName", e.target.value)
-            }}
-            onBlur={(e) => validateField("fullName", e.target.value)}
+            onChange={(e) => { setFullName(e.target.value); clearFieldError("fullName") }}
             required
-            error={getFieldError("fullName")}
+            error={fieldErrors.fullName}
           />
           <Input
             type="email"
             label="Email"
             placeholder="jane@example.com"
             value={email}
-            onChange={(e) => {
-              setEmail(e.target.value)
-              setServerErrorField((prev) => (prev === "email" ? null : prev))
-              validateField("email", e.target.value)
-            }}
-            onBlur={(e) => validateField("email", e.target.value)}
+            onChange={(e) => { setEmail(e.target.value); clearFieldError("email") }}
             required
-            error={getFieldError("email")}
+            error={fieldErrors.email}
           />
         </div>
         <Input
@@ -369,26 +250,17 @@ export const EditUserModal = ({
           placeholder="e.g. 09171234567"
           type="tel"
           value={contactNo}
-          onChange={(e) => {
-            setContactNo(e.target.value)
-            setServerErrorField((prev) => (prev === "contactNo" ? null : prev))
-            validateField("contactNo", e.target.value)
-          }}
-          onBlur={(e) => validateField("contactNo", e.target.value)}
-          error={getFieldError("contactNo")}
+          onChange={(e) => { setContactNo(e.target.value); clearFieldError("contactNo") }}
+          error={fieldErrors.contactNo}
         />
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
           <Input
             label="Position"
             placeholder="e.g. Developer, Manager"
             value={position}
-            onChange={(e) => {
-              setPosition(e.target.value)
-              validateField("position", e.target.value)
-            }}
-            onBlur={(e) => validateField("position", e.target.value)}
+            onChange={(e) => { setPosition(e.target.value); clearFieldError("position") }}
             required
-            error={getFieldError("position")}
+            error={fieldErrors.position}
           />
           <div className="flex flex-col gap-2">
             <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300" htmlFor="edit-user-role">
@@ -462,28 +334,18 @@ export const EditUserModal = ({
               id="edit-user-password"
               placeholder="••••••••"
               value={password}
-              onChange={(e) => {
-                setPassword(e.target.value)
-                setServerErrorField((prev) => (prev === "password" ? null : prev))
-                validateField("password", e.target.value)
-                if (confirmPassword) validateField("confirmPassword", confirmPassword, e.target.value)
-              }}
-              onBlur={(e) => validateField("password", e.target.value)}
+              onChange={(e) => { setPassword(e.target.value); clearFieldError("password") }}
               minLength={8}
               helperText="Leave blank to keep current password"
-              error={getFieldError("password")}
+              error={fieldErrors.password}
             />
             <PasswordInput
               id="edit-user-confirm-password"
               placeholder="Confirm password"
               value={confirmPassword}
-              onChange={(e) => {
-                setConfirmPassword(e.target.value)
-                validateField("confirmPassword", e.target.value, password)
-              }}
-              onBlur={(e) => validateField("confirmPassword", e.target.value, password)}
+              onChange={(e) => { setConfirmPassword(e.target.value); clearFieldError("confirmPassword") }}
               minLength={8}
-              error={getFieldError("confirmPassword")}
+              error={fieldErrors.confirmPassword}
             />
           </div>
         </div>
