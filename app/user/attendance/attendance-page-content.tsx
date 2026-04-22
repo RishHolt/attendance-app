@@ -834,6 +834,7 @@ export const AttendancePageContent = () => {
               {paginatedRows.map((row) => {
                 const displayStatus = computeDisplayStatusForRow(row, schedules)
                 const canRequestCorrection =
+                  me?.status !== "inactive" &&
                   (displayStatus === "late" ||
                     displayStatus === "absent" ||
                     displayStatus === "incomplete" ||
