@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
-import { requireAdmin } from "@/lib/auth"
+import { getAdminUser } from "@/lib/auth"
 import { formatTime24 } from "@/lib/format-time"
 import { deriveStatusFromTimes } from "@/lib/attendance-status"
 
@@ -289,8 +289,14 @@ export async function POST(
     }
 
     const supabase = await createClient()
-    const unauthorized = await requireAdmin(supabase)
-    if (unauthorized) return unauthorized
+    const { data: { user: authUser } } = await supabase.auth.getUser()
+    if (!authUser) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+    const isAdmin = !!(await getAdminUser(supabase))
+    if (!isAdmin && authUser.id !== userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
     const adminClient = createAdminClient()
 
     const { data: targetUser } = await adminClient

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
-import { requireAdmin } from "@/lib/auth"
+import { getAdminUser } from "@/lib/auth"
 import { formatTime24 } from "@/lib/format-time"
 import { deriveStatusFromTimes } from "@/lib/attendance-status"
 
@@ -58,8 +58,14 @@ export async function PATCH(
     }
 
     const supabase = await createClient()
-    const unauthorized = await requireAdmin(supabase)
-    if (unauthorized) return unauthorized
+    const { data: { user: authUser } } = await supabase.auth.getUser()
+    if (!authUser) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+    const isAdmin = !!(await getAdminUser(supabase))
+    if (!isAdmin && authUser.id !== userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
     const adminClient = createAdminClient()
 
     const body = await request.json()
@@ -69,6 +75,10 @@ export async function PATCH(
       timeOut?: string | null
       approvalStatus?: "pending" | "approved" | "denied"
       remarks?: string | null
+    }
+
+    if (!isAdmin && (approvalStatus !== undefined || remarks !== undefined)) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
     const updates: Record<string, unknown> = {}
@@ -194,7 +204,13 @@ export async function DELETE(
     }
 
     const supabase = await createClient()
-    const unauthorized = await requireAdmin(supabase)
+    const unauthorized = await (async () => {
+      const { data: { user: authUser } } = await supabase.auth.getUser()
+      if (!authUser) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+      const isAdmin = !!(await getAdminUser(supabase))
+      if (!isAdmin) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+      return null
+    })()
     if (unauthorized) return unauthorized
     const adminClient = createAdminClient()
 
