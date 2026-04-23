@@ -290,12 +290,19 @@ export async function POST(
 
     const supabase = await createClient()
     const { data: { user: authUser } } = await supabase.auth.getUser()
-    if (!authUser) {
+    if (!authUser?.email) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
     const isAdmin = !!(await getAdminUser(supabase))
-    if (!isAdmin && authUser.id !== userId) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    if (!isAdmin) {
+      const { data: publicUser } = await supabase
+        .from("users")
+        .select("id")
+        .eq("email", authUser.email.toLowerCase())
+        .maybeSingle()
+      if (!publicUser || publicUser.id !== userId) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+      }
     }
     const adminClient = createAdminClient()
 
