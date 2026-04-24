@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
-import { requireAdmin } from "@/lib/auth"
+import { requireAdmin, getSessionUser } from "@/lib/auth"
 import { formatTime24 } from "@/lib/format-time"
 import { deriveStatusFromTimes } from "@/lib/attendance-status"
 
@@ -58,8 +58,14 @@ export async function PATCH(
     }
 
     const supabase = await createClient()
-    const unauthorized = await requireAdmin(supabase)
-    if (unauthorized) return unauthorized
+    const sessionUser = await getSessionUser(supabase)
+    if (!sessionUser) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+    const isAdmin = sessionUser.role === "admin"
+    if (!isAdmin && sessionUser.id !== userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
     const adminClient = createAdminClient()
 
     const body = await request.json()
@@ -69,6 +75,10 @@ export async function PATCH(
       timeOut?: string | null
       approvalStatus?: "pending" | "approved" | "denied"
       remarks?: string | null
+    }
+
+    if (!isAdmin && (status !== undefined || approvalStatus !== undefined || remarks !== undefined)) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
     const updates: Record<string, unknown> = {}
