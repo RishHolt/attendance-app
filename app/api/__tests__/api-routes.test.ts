@@ -128,21 +128,44 @@ describe("POST /api/users/:id/attendances (user clock-in)", () => {
     process.env.LOCAL_ADMIN_EMAIL = originalEnv
   })
 
-  it("returns 401 when a non-admin employee tries to time in", async () => {
+  it("allows an employee to clock in for themselves", async () => {
     const { createClient } = await import("@/lib/supabase/server")
+    const { createAdminClient } = await import("@/lib/supabase/admin")
+
+    const mockInsert = vi.fn()
+    const mockSingle = vi.fn().mockResolvedValue({
+      data: { id: "att-1", user_id: "user-1", attendance_date: "2026-04-24", status: "present", time_in: "08:00", time_out: null },
+      error: null,
+    })
+    mockInsert.mockReturnValue({ select: vi.fn().mockReturnValue({ single: mockSingle }) })
+
+    const makeChainable = (resolved: unknown) => {
+      const chain: Record<string, unknown> = {
+        then: (resolve: (v: unknown) => unknown) => Promise.resolve(resolved).then(resolve),
+      }
+      for (const m of ["select", "eq", "neq", "in", "gte", "lte", "order", "range", "is", "single", "maybeSingle", "delete", "upsert"]) {
+        chain[m] = vi.fn(() => chain)
+      }
+      return chain
+    }
+
     vi.mocked(createClient).mockResolvedValue({
-      auth: {
-        getUser: vi.fn().mockResolvedValue({
-          data: { user: { email: "employee@example.com" } },
-          error: null,
-        }),
-      },
+      auth: { getUser: vi.fn().mockResolvedValue({ data: { user: { email: "employee@example.com" } }, error: null }) },
       from: vi.fn(() => ({
         select: vi.fn().mockReturnThis(),
         eq: vi.fn().mockReturnThis(),
-        single: vi.fn().mockResolvedValue({ data: { role: "employee" }, error: null }),
+        maybeSingle: vi.fn().mockResolvedValue({ data: { id: "user-1", role: "employee" }, error: null }),
       })),
     } as unknown as Awaited<ReturnType<typeof createClient>>)
+
+    vi.mocked(createAdminClient).mockReturnValue({
+      from: vi.fn((table: string) => {
+        if (table === "attendances") return { insert: mockInsert }
+        if (table === "schedules") return makeChainable({ data: [], error: null })
+        if (table === "users") return makeChainable({ data: { status: "active" }, error: null })
+        return makeChainable({ data: null, error: null })
+      }),
+    } as unknown as ReturnType<typeof createAdminClient>)
 
     const { POST } = await import("../users/[id]/attendances/route")
     const req = new Request("http://localhost/api/users/user-1/attendances", {
@@ -150,6 +173,29 @@ describe("POST /api/users/:id/attendances (user clock-in)", () => {
       body: JSON.stringify({ date: "2026-04-24", timeIn: "08:00" }),
     })
     const res = await POST(req, { params: Promise.resolve({ id: "user-1" }) })
+    expect(res.status).toBe(201)
+    const json = await res.json()
+    expect(json.timeIn).toBe("08:00")
+    expect(mockInsert).toHaveBeenCalled()
+  })
+
+  it("returns 401 when an employee tries to clock in for a different user", async () => {
+    const { createClient } = await import("@/lib/supabase/server")
+    vi.mocked(createClient).mockResolvedValue({
+      auth: { getUser: vi.fn().mockResolvedValue({ data: { user: { email: "employee@example.com" } }, error: null }) },
+      from: vi.fn(() => ({
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        maybeSingle: vi.fn().mockResolvedValue({ data: { id: "user-1", role: "employee" }, error: null }),
+      })),
+    } as unknown as Awaited<ReturnType<typeof createClient>>)
+
+    const { POST } = await import("../users/[id]/attendances/route")
+    const req = new Request("http://localhost/api/users/other-user/attendances", {
+      method: "POST",
+      body: JSON.stringify({ date: "2026-04-24", timeIn: "08:00" }),
+    })
+    const res = await POST(req, { params: Promise.resolve({ id: "other-user" }) })
     expect(res.status).toBe(401)
     const json = await res.json()
     expect(json.error).toBe("Unauthorized")
@@ -334,21 +380,53 @@ describe("PATCH /api/users/:id/attendances/:attendanceId (user time-out)", () =>
     process.env.LOCAL_ADMIN_EMAIL = originalEnv
   })
 
-  it("returns 401 when a non-admin employee tries to time out", async () => {
+  it("allows an employee to clock out for themselves", async () => {
     const { createClient } = await import("@/lib/supabase/server")
+    const { createAdminClient } = await import("@/lib/supabase/admin")
+
+    const makeChainable = (resolved: unknown) => {
+      const chain: Record<string, unknown> = {
+        then: (resolve: (v: unknown) => unknown) => Promise.resolve(resolved).then(resolve),
+      }
+      for (const m of ["select", "eq", "neq", "in", "gte", "lte", "order", "range", "is", "single", "maybeSingle", "delete", "upsert", "update"]) {
+        chain[m] = vi.fn(() => chain)
+      }
+      return chain
+    }
+
     vi.mocked(createClient).mockResolvedValue({
-      auth: {
-        getUser: vi.fn().mockResolvedValue({
-          data: { user: { email: "employee@example.com" } },
-          error: null,
-        }),
-      },
+      auth: { getUser: vi.fn().mockResolvedValue({ data: { user: { email: "employee@example.com" } }, error: null }) },
       from: vi.fn(() => ({
         select: vi.fn().mockReturnThis(),
         eq: vi.fn().mockReturnThis(),
-        single: vi.fn().mockResolvedValue({ data: { role: "employee" }, error: null }),
+        maybeSingle: vi.fn().mockResolvedValue({ data: { id: "user-1", role: "employee" }, error: null }),
       })),
     } as unknown as Awaited<ReturnType<typeof createClient>>)
+
+    let attendanceCallCount = 0
+    vi.mocked(createAdminClient).mockReturnValue({
+      from: vi.fn((table: string) => {
+        if (table === "attendances") {
+          attendanceCallCount++
+          if (attendanceCallCount === 1) {
+            return makeChainable({
+              data: { user_id: "user-1", attendance_date: "2026-04-24", time_in: "08:00", time_out: null },
+              error: null,
+            })
+          }
+          const chain = makeChainable(null)
+          chain["update"] = vi.fn((u: Record<string, unknown>) =>
+            makeChainable({
+              data: { id: "att-1", user_id: "user-1", attendance_date: "2026-04-24", status: u.status, time_in: "08:00", time_out: "17:00", approval_status: null, remarks: null },
+              error: null,
+            })
+          )
+          return chain
+        }
+        if (table === "schedules") return makeChainable({ data: [{ time_in: "09:00", day_of_week: 5, custom_date: null }], error: null })
+        return makeChainable({ data: null, error: null })
+      }),
+    } as unknown as ReturnType<typeof createAdminClient>)
 
     const { PATCH } = await import("../users/[id]/attendances/[attendanceId]/route")
     const req = new Request("http://localhost/api/users/user-1/attendances/att-1", {
@@ -356,9 +434,49 @@ describe("PATCH /api/users/:id/attendances/:attendanceId (user time-out)", () =>
       body: JSON.stringify({ timeOut: "17:00" }),
     })
     const res = await PATCH(req, { params: Promise.resolve({ id: "user-1", attendanceId: "att-1" }) })
-    expect(res.status).toBe(401)
+    expect(res.status).toBe(200)
     const json = await res.json()
-    expect(json.error).toBe("Unauthorized")
+    expect(json.timeOut).toBe("17:00")
+  })
+
+  it("returns 401 when an employee tries to update another user's attendance", async () => {
+    const { createClient } = await import("@/lib/supabase/server")
+    vi.mocked(createClient).mockResolvedValue({
+      auth: { getUser: vi.fn().mockResolvedValue({ data: { user: { email: "employee@example.com" } }, error: null }) },
+      from: vi.fn(() => ({
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        maybeSingle: vi.fn().mockResolvedValue({ data: { id: "user-1", role: "employee" }, error: null }),
+      })),
+    } as unknown as Awaited<ReturnType<typeof createClient>>)
+
+    const { PATCH } = await import("../users/[id]/attendances/[attendanceId]/route")
+    const req = new Request("http://localhost/api/users/other-user/attendances/att-1", {
+      method: "PATCH",
+      body: JSON.stringify({ timeOut: "17:00" }),
+    })
+    const res = await PATCH(req, { params: Promise.resolve({ id: "other-user", attendanceId: "att-1" }) })
+    expect(res.status).toBe(401)
+  })
+
+  it("returns 401 when an employee tries to set approvalStatus on their own record", async () => {
+    const { createClient } = await import("@/lib/supabase/server")
+    vi.mocked(createClient).mockResolvedValue({
+      auth: { getUser: vi.fn().mockResolvedValue({ data: { user: { email: "employee@example.com" } }, error: null }) },
+      from: vi.fn(() => ({
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        maybeSingle: vi.fn().mockResolvedValue({ data: { id: "user-1", role: "employee" }, error: null }),
+      })),
+    } as unknown as Awaited<ReturnType<typeof createClient>>)
+
+    const { PATCH } = await import("../users/[id]/attendances/[attendanceId]/route")
+    const req = new Request("http://localhost/api/users/user-1/attendances/att-1", {
+      method: "PATCH",
+      body: JSON.stringify({ approvalStatus: "approved" }),
+    })
+    const res = await PATCH(req, { params: Promise.resolve({ id: "user-1", attendanceId: "att-1" }) })
+    expect(res.status).toBe(401)
   })
 
   it("allows admin to record time out and derives present status when clocked in on time", async () => {
