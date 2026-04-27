@@ -332,7 +332,7 @@ export const AttendancePageContent = () => {
 
   const handleTimeIn = async () => {
     if (!me) return
-    setIsClockInLoading(true)
+    setIsTimeInLoading(true)
     try {
       const today = getTodayISO()
       const now = getCurrentTime()
@@ -371,13 +371,13 @@ export const AttendancePageContent = () => {
     } catch {
       swal.error("Failed to time in")
     } finally {
-      setIsClockInLoading(false)
+      setIsTimeInLoading(false)
     }
   }
 
   const handleTimeOut = async () => {
     if (!me || !attendance) return
-    setIsClockOutLoading(true)
+    setIsTimeOutLoading(true)
     try {
       const now = getCurrentTime()
       const res = await fetch(`/api/users/${me.id}/attendances/${attendance.id}`, {
@@ -398,7 +398,7 @@ export const AttendancePageContent = () => {
     } catch {
       swal.error("Failed to time out")
     } finally {
-      setIsClockOutLoading(false)
+      setIsTimeOutLoading(false)
     }
   }
 
