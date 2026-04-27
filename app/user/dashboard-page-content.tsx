@@ -363,9 +363,9 @@ export const DashboardPageContent = () => {
                   <p className="font-medium text-zinc-900 dark:text-zinc-100">
                     {todayAttendance?.timeIn
                       ? todayAttendance.timeOut
-                        ? "Clocked out"
-                        : "Clocked in"
-                      : "Not clocked in yet"}
+                        ? "Timed out"
+                        : "Timed in"
+                      : "Not timed in yet"}
                   </p>
                   <p className="text-sm text-zinc-500 dark:text-zinc-400">
                     {todayAttendance?.timeIn ? (

@@ -304,7 +304,7 @@ export async function POST(
       .eq("id", userId)
       .maybeSingle()
     if ((targetUser as { status?: string } | null)?.status === "inactive") {
-      return NextResponse.json({ error: "User is inactive and cannot clock in or out" }, { status: 403 })
+      return NextResponse.json({ error: "User is inactive and cannot time in or out" }, { status: 403 })
     }
 
     const ti = timeIn?.trim() || null

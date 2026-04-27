@@ -158,8 +158,8 @@ export const AttendancePageContent = () => {
   const [schedules, setSchedules] = useState<ScheduleRow[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
-  const [isClockInLoading, setIsClockInLoading] = useState(false)
-  const [isClockOutLoading, setIsClockOutLoading] = useState(false)
+  const [isTimeInLoading, setIsTimeInLoading] = useState(false)
+  const [isTimeOutLoading, setIsTimeOutLoading] = useState(false)
   const [correctionModalRow, setCorrectionModalRow] = useState<AttendanceRow | null>(null)
   const [statusFilter, setStatusFilter] = useState<DisplayStatus | "all">("all")
 
@@ -330,7 +330,7 @@ export const AttendancePageContent = () => {
     [filteredList, schedules]
   )
 
-  const handleClockIn = async () => {
+  const handleTimeIn = async () => {
     if (!me) return
     setIsClockInLoading(true)
     try {
@@ -366,7 +366,7 @@ export const AttendancePageContent = () => {
           return
         }
       }
-      await swal.success("Clocked in successfully")
+      await swal.success("Timed in successfully")
       fetchData()
     } catch {
       swal.error("Failed to time in")
@@ -375,7 +375,7 @@ export const AttendancePageContent = () => {
     }
   }
 
-  const handleClockOut = async () => {
+  const handleTimeOut = async () => {
     if (!me || !attendance) return
     setIsClockOutLoading(true)
     try {
@@ -393,7 +393,7 @@ export const AttendancePageContent = () => {
         swal.error(data.error ?? "Failed to time out")
         return
       }
-      await swal.success("Clocked out successfully")
+      await swal.success("Timed out successfully")
       fetchData()
     } catch {
       swal.error("Failed to time out")
@@ -557,9 +557,9 @@ export const AttendancePageContent = () => {
                 ) : todaySchedule ? (
                   <>
                     <Button
-                      onClick={handleClockIn}
-                      disabled={hasTimeIn || isClockInLoading || isDenied}
-                      isLoading={isClockInLoading}
+                      onClick={handleTimeIn}
+                      disabled={hasTimeIn || isTimeInLoading || isDenied}
+                      isLoading={isTimeInLoading}
                       leftIcon={<LogIn className="h-5 w-5" />}
                       size="lg"
                       className="min-w-[140px] sm:w-auto"
@@ -573,9 +573,9 @@ export const AttendancePageContent = () => {
                     </Button>
                     <Button
                       variant="secondary"
-                      onClick={handleClockOut}
-                      disabled={!hasTimeIn || hasTimeOut || isClockOutLoading || isDenied}
-                      isLoading={isClockOutLoading}
+                      onClick={handleTimeOut}
+                      disabled={!hasTimeIn || hasTimeOut || isTimeOutLoading || isDenied}
+                      isLoading={isTimeOutLoading}
                       leftIcon={<LogOut className="h-5 w-5" />}
                       size="lg"
                       className="min-w-[140px] sm:w-auto"

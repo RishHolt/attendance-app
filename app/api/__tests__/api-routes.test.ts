@@ -116,7 +116,7 @@ describe("POST /api/attendances/mark-absent", () => {
   })
 })
 
-describe("POST /api/users/:id/attendances (user clock-in)", () => {
+describe("POST /api/users/:id/attendances (user time-in)", () => {
   const originalEnv = process.env.LOCAL_ADMIN_EMAIL
 
   beforeEach(() => {
@@ -128,7 +128,7 @@ describe("POST /api/users/:id/attendances (user clock-in)", () => {
     process.env.LOCAL_ADMIN_EMAIL = originalEnv
   })
 
-  it("allows an employee to clock in for themselves", async () => {
+  it("allows an employee to time in for themselves", async () => {
     const { createClient } = await import("@/lib/supabase/server")
     const { createAdminClient } = await import("@/lib/supabase/admin")
 
@@ -179,7 +179,7 @@ describe("POST /api/users/:id/attendances (user clock-in)", () => {
     expect(mockInsert).toHaveBeenCalled()
   })
 
-  it("returns 401 when an employee tries to clock in for a different user", async () => {
+  it("returns 401 when an employee tries to time in for a different user", async () => {
     const { createClient } = await import("@/lib/supabase/server")
     vi.mocked(createClient).mockResolvedValue({
       auth: { getUser: vi.fn().mockResolvedValue({ data: { user: { email: "employee@example.com" } }, error: null }) },
@@ -380,7 +380,7 @@ describe("PATCH /api/users/:id/attendances/:attendanceId (user time-out)", () =>
     process.env.LOCAL_ADMIN_EMAIL = originalEnv
   })
 
-  it("allows an employee to clock out for themselves", async () => {
+  it("allows an employee to time out for themselves", async () => {
     const { createClient } = await import("@/lib/supabase/server")
     const { createAdminClient } = await import("@/lib/supabase/admin")
 
@@ -479,7 +479,7 @@ describe("PATCH /api/users/:id/attendances/:attendanceId (user time-out)", () =>
     expect(res.status).toBe(401)
   })
 
-  it("allows admin to record time out and derives present status when clocked in on time", async () => {
+  it("allows admin to record time out and derives present status when timed in on time", async () => {
     const { createClient } = await import("@/lib/supabase/server")
     const { createAdminClient } = await import("@/lib/supabase/admin")
 
@@ -557,7 +557,7 @@ describe("PATCH /api/users/:id/attendances/:attendanceId (user time-out)", () =>
     expect(json.status).toBe("present")
   })
 
-  it("derives late status when clocked in more than 60 minutes after schedule", async () => {
+  it("derives late status when timed in more than 60 minutes after schedule", async () => {
     const { createClient } = await import("@/lib/supabase/server")
     const { createAdminClient } = await import("@/lib/supabase/admin")
 

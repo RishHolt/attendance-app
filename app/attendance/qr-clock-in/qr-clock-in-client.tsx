@@ -37,7 +37,7 @@ const hasScheduleForToday = (rows: { customDate: string | null; dayOfWeek: numbe
 export const QrClockInClient = () => {
   const router = useRouter()
   const [status, setStatus] = useState<"loading" | "success" | "error" | "cooldown">("loading")
-  const [message, setMessage] = useState("Clocking you in…")
+  const [message, setMessage] = useState("Timing you in…")
 
   useEffect(() => {
     const run = async () => {
@@ -82,7 +82,7 @@ export const QrClockInClient = () => {
         }
 
         if (attendance?.timeIn && attendance?.timeOut) {
-          setMessage("You're already clocked in and out for today")
+          setMessage("You're already timed in and out for today")
           setStatus("success")
           setTimeout(() => router.replace("/user"), 1500)
           return
@@ -117,7 +117,7 @@ export const QrClockInClient = () => {
             setStatus("error")
             return
           }
-          setMessage("Clocked out successfully")
+          setMessage("Timed out successfully")
           setStatus("success")
           setTimeout(() => router.replace("/user"), 1500)
           return
@@ -160,7 +160,7 @@ export const QrClockInClient = () => {
           }
         }
 
-        setMessage("Clocked in successfully")
+        setMessage("Timed in successfully")
         setStatus("success")
         setTimeout(() => router.replace("/user"), 1500)
       } catch {
