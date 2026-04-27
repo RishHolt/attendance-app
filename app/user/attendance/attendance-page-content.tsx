@@ -341,7 +341,6 @@ export const AttendancePageContent = () => {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            status: "present",
             timeIn: now,
             timeOut: attendance.timeOut ?? null,
           }),
@@ -385,7 +384,6 @@ export const AttendancePageContent = () => {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          status: "present",
           timeIn: attendance.timeIn ?? null,
           timeOut: now,
         }),
