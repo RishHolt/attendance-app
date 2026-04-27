@@ -45,37 +45,37 @@ export async function GET(request: Request) {
     const attendanceIds = [...new Set(rows.map((r) => r.attendance_id))]
     const userIds = [...new Set(rows.map((r) => r.user_id))]
 
-    let attendanceMap = new Map<string, { date: string; timeIn: string | null; timeOut: string | null }>()
-    let userMap = new Map<string, { fullName: string; userDisplayId: string }>()
+    const [attRes, userRes] = await Promise.all([
+      attendanceIds.length > 0
+        ? supabase
+            .from("attendances")
+            .select("id, attendance_date, time_in, time_out")
+            .in("id", attendanceIds)
+        : Promise.resolve({ data: [] as Array<{ id: string; attendance_date: string; time_in: string | null; time_out: string | null }> }),
+      userIds.length > 0
+        ? supabase
+            .from("users")
+            .select("id, full_name, user_id")
+            .in("id", userIds)
+        : Promise.resolve({ data: [] as Array<{ id: string; full_name: string | null; user_id: string | null }> }),
+    ])
 
-    if (attendanceIds.length > 0) {
-      const { data: attData } = await supabase
-        .from("attendances")
-        .select("id, attendance_date, time_in, time_out")
-        .in("id", attendanceIds)
-      attendanceMap = new Map(
-        (attData ?? []).map((a) => [
-          a.id,
-          {
-            date: a.attendance_date,
-            timeIn: a.time_in ? formatTime24(a.time_in) : null,
-            timeOut: a.time_out ? formatTime24(a.time_out) : null,
-          },
-        ])
-      )
-    }
-    if (userIds.length > 0) {
-      const { data: userData } = await supabase
-        .from("users")
-        .select("id, full_name, user_id")
-        .in("id", userIds)
-      userMap = new Map(
-        (userData ?? []).map((u) => [
-          u.id,
-          { fullName: u.full_name ?? "Unknown", userDisplayId: u.user_id ?? "" },
-        ])
-      )
-    }
+    const attendanceMap = new Map(
+      (attRes.data ?? []).map((a) => [
+        a.id,
+        {
+          date: a.attendance_date,
+          timeIn: a.time_in ? formatTime24(a.time_in) : null,
+          timeOut: a.time_out ? formatTime24(a.time_out) : null,
+        },
+      ])
+    )
+    const userMap = new Map(
+      (userRes.data ?? []).map((u) => [
+        u.id,
+        { fullName: u.full_name ?? "Unknown", userDisplayId: u.user_id ?? "" },
+      ])
+    )
 
     const result = rows.map((r) => {
       const att = attendanceMap.get(r.attendance_id)

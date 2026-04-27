@@ -10,48 +10,111 @@ export type { UserRow }
 const generateUserId = (): string =>
   String(Math.floor(Math.random() * 89999999) + 10000000)
 
-export async function GET() {
+const FULL_COLUMNS =
+  "id, user_id, full_name, email, contact_no, position, status, start_date, end_date, role, required_hours, avatar_url"
+const FALLBACK_COLUMNS =
+  "id, user_id, full_name, email, contact_no, position, status, role, avatar_url"
+
+const mapUserRow = (
+  row: Record<string, unknown> & { start_date?: string | null; end_date?: string | null }
+): UserRow => ({
+  id: String(row.id),
+  userId: String(row.user_id),
+  fullName: String(row.full_name),
+  email: String(row.email),
+  contactNo: row.contact_no as string | null,
+  position: row.position as string | null,
+  status: row.status as "active" | "inactive",
+  startDate: (row.start_date as string | null) ?? null,
+  endDate: (row.end_date as string | null) ?? null,
+  role: ((row.role as string | null) ?? "employee") as "employee" | "admin" | "ojt",
+  requiredHours: (row.required_hours as number | null) ?? null,
+  avatarUrl: (row.avatar_url as string | null) ?? null,
+})
+
+export async function GET(request: Request) {
   try {
     const supabase = await createClient()
     const unauthorized = await requireAdmin(supabase)
     if (unauthorized) return unauthorized
 
-    const withStartDate = await supabase
-      .from("users")
-      .select("id, user_id, full_name, email, contact_no, position, status, start_date, end_date, role, required_hours, avatar_url")
-      .order("created_at", { ascending: false })
+    const { searchParams } = new URL(request.url)
+    const pageParam = searchParams.get("page")
+    const search = searchParams.get("search")?.trim() ?? ""
+    const statusFilter = searchParams.get("status")
+    const roleFilter = searchParams.get("role")
+    const validStatus = statusFilter === "active" || statusFilter === "inactive"
+    const validRole =
+      roleFilter === "employee" || roleFilter === "admin" || roleFilter === "ojt"
+    const searchPattern = search.length > 0 ? `*${search}*` : null
 
+    // Filters are purely additive — existing callers don't pass these params,
+    // so legacy responses are byte-identical when no params are supplied.
+    const buildQuery = (cols: string, withCount: boolean) => {
+      let q = withCount
+        ? supabase.from("users").select(cols, { count: "exact" })
+        : supabase.from("users").select(cols)
+      if (searchPattern) {
+        q = q.or(
+          `full_name.ilike.${searchPattern},email.ilike.${searchPattern},user_id.ilike.${searchPattern}`
+        )
+      }
+      if (validStatus) q = q.eq("status", statusFilter as string)
+      if (validRole) q = q.eq("role", roleFilter as string)
+      return q.order("created_at", { ascending: false })
+    }
+
+    type UserRecord = Record<string, unknown> & {
+      start_date?: string | null
+      end_date?: string | null
+    }
+
+    // Paginated branch — opt-in via ?page=
+    if (pageParam != null) {
+      const page = Math.max(1, parseInt(pageParam, 10) || 1)
+      const pageSize = Math.min(
+        200,
+        Math.max(1, parseInt(searchParams.get("pageSize") ?? "50", 10) || 50)
+      )
+      const offset = (page - 1) * pageSize
+
+      const primary = await buildQuery(FULL_COLUMNS, true).range(
+        offset,
+        offset + pageSize - 1
+      )
+      const msg = String(primary.error?.message ?? "").toLowerCase()
+      const useFallback =
+        primary.error && (msg.includes("start_date") || msg.includes("column"))
+      const result = useFallback
+        ? await buildQuery(FALLBACK_COLUMNS, true).range(offset, offset + pageSize - 1)
+        : primary
+
+      if (result.error) {
+        return NextResponse.json({ error: result.error.message }, { status: 500 })
+      }
+
+      const rows = (result.data ?? []) as unknown as UserRecord[]
+      return NextResponse.json({
+        rows: rows.map(mapUserRow),
+        total: result.count ?? 0,
+        page,
+        pageSize,
+      })
+    }
+
+    // Legacy branch — full array, no shape change for existing callers
+    const withStartDate = await buildQuery(FULL_COLUMNS, false)
     const msg = String(withStartDate.error?.message ?? "").toLowerCase()
-    const useFallback = withStartDate.error && (msg.includes("start_date") || msg.includes("column"))
-
-    const result = useFallback
-      ? await supabase
-          .from("users")
-          .select("id, user_id, full_name, email, contact_no, position, status, role, avatar_url")
-          .order("created_at", { ascending: false })
-      : withStartDate
+    const useFallback =
+      withStartDate.error && (msg.includes("start_date") || msg.includes("column"))
+    const result = useFallback ? await buildQuery(FALLBACK_COLUMNS, false) : withStartDate
 
     if (result.error) {
       return NextResponse.json({ error: result.error.message }, { status: 500 })
     }
 
-    const rows = (result.data ?? []) as Array<Record<string, unknown> & { start_date?: string | null; end_date?: string | null }>
-    const users: UserRow[] = rows.map((row) => ({
-      id: String(row.id),
-      userId: String(row.user_id),
-      fullName: String(row.full_name),
-      email: String(row.email),
-      contactNo: row.contact_no as string | null,
-      position: row.position as string | null,
-      status: row.status as "active" | "inactive",
-      startDate: (row.start_date as string | null) ?? null,
-      endDate: (row.end_date as string | null) ?? null,
-      role: ((row.role as string | null) ?? "employee") as "employee" | "admin" | "ojt",
-      requiredHours: (row.required_hours as number | null) ?? null,
-      avatarUrl: (row.avatar_url as string | null) ?? null,
-    }))
-
-    return NextResponse.json(users)
+    const rows = (result.data ?? []) as unknown as UserRecord[]
+    return NextResponse.json(rows.map(mapUserRow))
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Failed to fetch users" },

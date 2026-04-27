@@ -2,6 +2,11 @@ import { createServerClient } from "@supabase/ssr"
 import { NextResponse, type NextRequest } from "next/server"
 import { getSupabasePublicEnv } from "@/lib/env"
 
+// Per-process cache of user → role to avoid hitting the DB on every protected
+// request. 60s TTL is short enough that role changes propagate quickly.
+const ROLE_TTL_MS = 60_000
+const roleCache = new Map<string, { role: string | null; expiresAt: number }>()
+
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
     request,
@@ -37,12 +42,20 @@ export async function updateSession(request: NextRequest) {
     const isEnvAdmin = adminEmail && user.email?.toLowerCase() === adminEmail.toLowerCase()
 
     if (!isEnvAdmin) {
-      const { data } = await supabase
-        .from("users")
-        .select("role")
-        .eq("email", user.email!.toLowerCase())
-        .single()
-      if (data?.role !== "admin") {
+      let role: string | null
+      const cached = roleCache.get(user.id)
+      if (cached && cached.expiresAt > Date.now()) {
+        role = cached.role
+      } else {
+        const { data } = await supabase
+          .from("users")
+          .select("role")
+          .eq("id", user.id)
+          .single()
+        role = (data?.role as string | null) ?? null
+        roleCache.set(user.id, { role, expiresAt: Date.now() + ROLE_TTL_MS })
+      }
+      if (role !== "admin") {
         return NextResponse.redirect(new URL("/user/attendance", request.url))
       }
     }

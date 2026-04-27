@@ -126,36 +126,40 @@ export async function GET(
 
     const supabase = await createClient()
     const todayStr = new Date().toISOString().slice(0, 10)
+    const cleanupAdminClient = createAdminClient()
 
-    const { data: userRow } = await supabase
-      .from("users")
-      .select("start_date, end_date, status")
-      .eq("id", userId)
-      .maybeSingle()
+    // These four reads/deletes are independent — fire them concurrently.
+    const [
+      { data: userRow },
+      scheduledDates,
+      { data: existingAttByDate },
+    ] = await Promise.all([
+      supabase
+        .from("users")
+        .select("start_date, end_date, status")
+        .eq("id", userId)
+        .maybeSingle(),
+      getScheduledDatesInRange(supabase, userId, from, to),
+      supabase
+        .from("attendances")
+        .select("attendance_date")
+        .eq("user_id", userId)
+        .gte("attendance_date", from)
+        .lte("attendance_date", to),
+      // Phantom-absent cleanup runs in parallel; its result is unused.
+      cleanupAdminClient
+        .from("attendances")
+        .delete()
+        .eq("user_id", userId)
+        .eq("attendance_date", todayStr)
+        .eq("status", "absent")
+        .is("time_in", null)
+        .is("time_out", null),
+    ])
     const startDate = (userRow as { start_date?: string | null } | null)?.start_date ?? null
     const endDate = (userRow as { end_date?: string | null } | null)?.end_date ?? null
     const userStatus = (userRow as { status?: string | null } | null)?.status ?? "active"
-
-    const scheduledDates = await getScheduledDatesInRange(supabase, userId, from, to)
-    const { data: existingAttByDate } = await supabase
-      .from("attendances")
-      .select("attendance_date")
-      .eq("user_id", userId)
-      .gte("attendance_date", from)
-      .lte("attendance_date", to)
     const existingDates = new Set((existingAttByDate ?? []).map((r) => r.attendance_date))
-
-    // Clean up any phantom absent records that were created for today
-    // before this fix (no time_in, no time_out — user never actually clocked in).
-    const cleanupAdminClient = createAdminClient()
-    await cleanupAdminClient
-      .from("attendances")
-      .delete()
-      .eq("user_id", userId)
-      .eq("attendance_date", todayStr)
-      .eq("status", "absent")
-      .is("time_in", null)
-      .is("time_out", null)
 
     const toInsert: { user_id: string; attendance_date: string; status: string; approval_status: string }[] = []
     for (const dateStr of scheduledDates) {
@@ -184,25 +188,29 @@ export async function GET(
 
     const selectFields = "id, user_id, attendance_date, status, time_in, time_out, approval_status, remarks"
 
-    const { data: listData, error: listError, count } = await supabase
-      .from("attendances")
-      .select(selectFields, { count: "exact" })
-      .eq("user_id", userId)
-      .gte("attendance_date", from)
-      .lte("attendance_date", to)
-      .order("attendance_date", { ascending: false })
-      .range(offset, offset + limit - 1)
+    const [
+      { data: listData, error: listError, count },
+      { data: statsData },
+    ] = await Promise.all([
+      supabase
+        .from("attendances")
+        .select(selectFields, { count: "exact" })
+        .eq("user_id", userId)
+        .gte("attendance_date", from)
+        .lte("attendance_date", to)
+        .order("attendance_date", { ascending: false })
+        .range(offset, offset + limit - 1),
+      supabase
+        .from("attendances")
+        .select("status")
+        .eq("user_id", userId)
+        .gte("attendance_date", from)
+        .lte("attendance_date", to),
+    ])
 
     if (listError) {
       return NextResponse.json({ error: listError.message }, { status: 500 })
     }
-
-    const { data: statsData } = await supabase
-      .from("attendances")
-      .select("status")
-      .eq("user_id", userId)
-      .gte("attendance_date", from)
-      .lte("attendance_date", to)
 
     const attendanceIds = (listData ?? []).map((r) => r.id)
     const correctionMap = new Map<string, { status: string; id: string }>()

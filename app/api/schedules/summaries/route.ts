@@ -38,21 +38,65 @@ function formatDaysRange(days: number[]): string {
     .join(", ")
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const supabase = await createClient()
     const unauthorized = await requireAdmin(supabase)
     if (unauthorized) return unauthorized
 
-    const { data: usersData } = await supabase
-      .from("users")
-      .select("id")
-      .neq("role", "admin")
-      .order("created_at", { ascending: false })
+    const { searchParams } = new URL(request.url)
+    const pageParam = searchParams.get("page")
+    const search = searchParams.get("search")?.trim() ?? ""
+    const searchPattern = search.length > 0 ? `*${search}*` : null
 
-    const userIds = (usersData ?? []).map((u) => u.id)
+    // Pagination is opt-in via ?page=. Without it, response shape is unchanged
+    // (plain array) so existing callers don't break.
+    const paginated = pageParam != null
+
+    let usersQuery = paginated
+      ? supabase
+          .from("users")
+          .select("id", { count: "exact" })
+          .neq("role", "admin")
+      : supabase
+          .from("users")
+          .select("id")
+          .neq("role", "admin")
+
+    if (searchPattern) {
+      usersQuery = usersQuery.or(
+        `full_name.ilike.${searchPattern},email.ilike.${searchPattern},user_id.ilike.${searchPattern}`
+      )
+    }
+    usersQuery = usersQuery.order("created_at", { ascending: false })
+
+    let total = 0
+    let userIds: string[] = []
+    let page = 1
+    let pageSize = 50
+
+    if (paginated) {
+      page = Math.max(1, parseInt(pageParam, 10) || 1)
+      pageSize = Math.min(
+        200,
+        Math.max(1, parseInt(searchParams.get("pageSize") ?? "50", 10) || 50)
+      )
+      const offset = (page - 1) * pageSize
+      const { data: usersData, count } = await usersQuery.range(
+        offset,
+        offset + pageSize - 1
+      )
+      userIds = (usersData ?? []).map((u) => u.id)
+      total = count ?? 0
+    } else {
+      const { data: usersData } = await usersQuery
+      userIds = (usersData ?? []).map((u) => u.id)
+    }
+
     if (userIds.length === 0) {
-      return NextResponse.json([])
+      return NextResponse.json(
+        paginated ? { rows: [], total, page, pageSize } : []
+      )
     }
 
     const { data: schedulesData } = await supabase
@@ -167,7 +211,9 @@ export async function GET() {
       return { userId, hasSchedule: true, summary }
     })
 
-    return NextResponse.json(result)
+    return NextResponse.json(
+      paginated ? { rows: result, total, page, pageSize } : result
+    )
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Failed to fetch schedule summaries" },

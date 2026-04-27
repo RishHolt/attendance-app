@@ -67,12 +67,24 @@ export async function POST(req: NextRequest) {
     const fromStr = `${year}-${pad(month)}-01`
     const toStr = `${year}-${pad(month)}-${pad(endDate.getDate())}`
 
-    const { data: schedules } = await supabase
-      .from('schedules')
-      .select('day_of_week, custom_date, time_in, time_out, break_time, break_duration')
-      .eq('user_id', userId)
+    // Fetch schedules (filtered to this month) and attendances in parallel.
+    const [schedulesRes, attendancesRes] = await Promise.all([
+      supabase
+        .from('schedules')
+        .select('day_of_week, custom_date, time_in, time_out, break_time, break_duration')
+        .eq('user_id', userId)
+        .or(`custom_date.is.null,and(custom_date.gte.${fromStr},custom_date.lte.${toStr})`),
+      supabase
+        .from('attendances')
+        .select('attendance_date, time_in, time_out, status')
+        .eq('user_id', userId)
+        .gte('attendance_date', fromStr)
+        .lte('attendance_date', toStr)
+        .order('attendance_date', { ascending: true }),
+    ])
 
-    const scheduleRows = schedules ?? []
+    const scheduleRows = schedulesRes.data ?? []
+    const attendances = attendancesRes.data
 
     const getScheduleForDate = (dateStr: string, dayOfWeek: number) => {
       const customMatch = scheduleRows.find(r => {
@@ -86,14 +98,6 @@ export async function POST(req: NextRequest) {
         return typeof dow === 'number' && dow === dayOfWeek
       }) ?? null
     }
-
-    const { data: attendances } = await supabase
-      .from('attendances')
-      .select('attendance_date, time_in, time_out, status')
-      .eq('user_id', userId)
-      .gte('attendance_date', fromStr)
-      .lte('attendance_date', toStr)
-      .order('attendance_date', { ascending: true })
 
     const attendanceMap = new Map(
       (attendances ?? []).map(a => [

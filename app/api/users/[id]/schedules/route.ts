@@ -19,25 +19,28 @@ export async function GET(
 
     const supabase = await createClient()
 
-    const schedulesRes = await supabase
-      .from("schedules")
-      .select("id, user_id, day_of_week, custom_date, time_in, time_out, break_time, break_duration")
-      .eq("user_id", userId)
-      .order("day_of_week", { ascending: true, nullsFirst: false })
-      .order("custom_date", { ascending: true, nullsFirst: false })
-      .order("time_in", { ascending: true })
-
-    let defaultsData: { time_in: string; time_out: string; break_time: string | null; break_duration: number | null } | null = null
-    try {
-      const r = await supabase
+    const [schedulesRes, defaultsRes] = await Promise.all([
+      supabase
+        .from("schedules")
+        .select("id, user_id, day_of_week, custom_date, time_in, time_out, break_time, break_duration")
+        .eq("user_id", userId)
+        .order("day_of_week", { ascending: true, nullsFirst: false })
+        .order("custom_date", { ascending: true, nullsFirst: false })
+        .order("time_in", { ascending: true }),
+      supabase
         .from("user_schedule_defaults")
         .select("time_in, time_out, break_time, break_duration")
         .eq("user_id", userId)
         .maybeSingle()
-      defaultsData = r.data
-    } catch {
-      defaultsData = null
-    }
+        .then(
+          (r) => r,
+          () => ({ data: null as null }),
+        ),
+    ])
+
+    const defaultsData = defaultsRes.data as
+      | { time_in: string; time_out: string; break_time: string | null; break_duration: number | null }
+      | null
 
     if (schedulesRes.error) {
       return NextResponse.json({ error: schedulesRes.error.message }, { status: 500 })

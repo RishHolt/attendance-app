@@ -53,7 +53,8 @@ export async function GET(request: Request) {
         approval_status,
         time_in,
         time_out,
-        remarks
+        remarks,
+        user:users!attendances_user_id_fkey ( user_id, full_name )
       `,
         { count: "exact" }
       )
@@ -94,24 +95,22 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: attError.message }, { status: 500 })
     }
 
-    const attendanceRows = attendancesData ?? []
-    const userIds = [...new Set(attendanceRows.map((a) => a.user_id))]
-
-    if (userIds.length === 0) {
-      return NextResponse.json({ rows: [], total: count ?? 0 })
+    type JoinedRow = {
+      id: string
+      user_id: string
+      attendance_date: string
+      status: string
+      approval_status: string | null
+      time_in: string | null
+      time_out: string | null
+      remarks: string | null
+      // Supabase typegen widens single-row FK joins to T | T[]; runtime is always a single object.
+      user: { user_id: string | null; full_name: string | null } | { user_id: string | null; full_name: string | null }[] | null
     }
-
-    const { data: usersData } = await supabase
-      .from("users")
-      .select("id, user_id, full_name")
-      .in("id", userIds)
-
-    const userMap = new Map(
-      (usersData ?? []).map((u) => [u.id, { user_id: u.user_id, full_name: u.full_name }])
-    )
+    const attendanceRows = (attendancesData ?? []) as unknown as JoinedRow[]
 
     const rows: AdminAttendanceRow[] = attendanceRows.map((row) => {
-      const user = userMap.get(row.user_id)
+      const user = Array.isArray(row.user) ? row.user[0] ?? null : row.user
       return {
         id: row.id,
         userId: row.user_id,
@@ -122,7 +121,7 @@ export async function GET(request: Request) {
         approvalStatus: (row.approval_status ?? "pending") as "pending" | "approved" | "denied",
         timeIn: row.time_in ? formatTime24(row.time_in) : null,
         timeOut: row.time_out ? formatTime24(row.time_out) : null,
-        remarks: (row as { remarks?: string | null }).remarks ?? null,
+        remarks: row.remarks ?? null,
       }
     })
 

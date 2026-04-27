@@ -5,6 +5,10 @@ import { requireAdmin } from "@/lib/auth"
 import { isFutureDate, resolveAbsentUserIds } from "@/lib/mark-absent"
 import { PH_OFFSET_MS } from "@/lib/constants"
 
+// Process active users in chunks to bound memory + Postgres `IN (...)` size.
+// Each chunk fires 2 reads (schedules + existing) and 1 upsert against Supabase.
+const BATCH_SIZE = 500
+
 export async function POST(request: Request) {
   try {
     const supabase = await createClient()
@@ -39,29 +43,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ marked: 0 })
     }
 
-    // Fetch schedules for active users on targetDate
-    const dayOfWeek = new Date(targetDate + "T12:00:00").getDay()
-    const { data: schedulesData, error: schedError } = await admin
-      .from("schedules")
-      .select("user_id, day_of_week, custom_date, time_out")
-      .in("user_id", allActiveIds)
-      .or(`day_of_week.eq.${dayOfWeek},custom_date.eq.${targetDate}`)
-
-    if (schedError) {
-      return NextResponse.json({ error: schedError.message }, { status: 500 })
-    }
-
-    // Fetch existing attendance records for active users on targetDate
-    const { data: existingData, error: existingError } = await admin
-      .from("attendances")
-      .select("user_id")
-      .in("user_id", allActiveIds)
-      .eq("attendance_date", targetDate)
-
-    if (existingError) {
-      return NextResponse.json({ error: existingError.message }, { status: 500 })
-    }
-
     // For today: only mark absent after the user's scheduled time_out has passed.
     // For past dates: no time restriction (null).
     // Schedule times are stored in Philippine time (UTC+8), so offset now accordingly.
@@ -72,35 +53,61 @@ export async function POST(request: Request) {
         ? `${String(nowPH.getUTCHours()).padStart(2, "0")}:${String(nowPH.getUTCMinutes()).padStart(2, "0")}`
         : null
 
-    const absentIds = resolveAbsentUserIds(
-      allActiveIds,
-      schedulesData ?? [],
-      existingData ?? [],
-      targetDate,
-      nowTime,
-    )
+    const dayOfWeek = new Date(targetDate + "T12:00:00").getDay()
+    let totalMarked = 0
 
-    if (absentIds.length === 0) {
-      return NextResponse.json({ marked: 0 })
+    for (let i = 0; i < allActiveIds.length; i += BATCH_SIZE) {
+      const chunk = allActiveIds.slice(i, i + BATCH_SIZE)
+
+      const [schedRes, existingRes] = await Promise.all([
+        admin
+          .from("schedules")
+          .select("user_id, day_of_week, custom_date, time_out")
+          .in("user_id", chunk)
+          .or(`day_of_week.eq.${dayOfWeek},custom_date.eq.${targetDate}`),
+        admin
+          .from("attendances")
+          .select("user_id")
+          .in("user_id", chunk)
+          .eq("attendance_date", targetDate),
+      ])
+
+      if (schedRes.error) {
+        return NextResponse.json({ error: schedRes.error.message }, { status: 500 })
+      }
+      if (existingRes.error) {
+        return NextResponse.json({ error: existingRes.error.message }, { status: 500 })
+      }
+
+      const absentIds = resolveAbsentUserIds(
+        chunk,
+        schedRes.data ?? [],
+        existingRes.data ?? [],
+        targetDate,
+        nowTime,
+      )
+
+      if (absentIds.length === 0) continue
+
+      const toInsert = absentIds.map((id) => ({
+        user_id: id,
+        attendance_date: targetDate,
+        status: "absent",
+        approval_status: "approved",
+      }))
+
+      const { error: insertError } = await admin
+        .from("attendances")
+        .upsert(toInsert, { onConflict: "user_id,attendance_date", ignoreDuplicates: true })
+
+      if (insertError) {
+        return NextResponse.json({ error: insertError.message }, { status: 500 })
+      }
+
+      totalMarked += absentIds.length
     }
 
-    const toInsert = absentIds.map((id) => ({
-      user_id: id,
-      attendance_date: targetDate,
-      status: "absent",
-      approval_status: "approved",
-    }))
-
-    // Upsert — ignore conflicts in case of a race condition
-    const { error: insertError } = await admin
-      .from("attendances")
-      .upsert(toInsert, { onConflict: "user_id,attendance_date", ignoreDuplicates: true })
-
-    if (insertError) {
-      return NextResponse.json({ error: insertError.message }, { status: 500 })
-    }
-
-    return NextResponse.json({ marked: absentIds.length })
+    return NextResponse.json({ marked: totalMarked })
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Failed to mark absent" },

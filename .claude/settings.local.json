@@ -20,7 +20,11 @@
       "Bash(yes)",
       "Bash(npx shadcn@latest add @animate-ui/components-backgrounds-stars)",
       "Bash(git checkout *)",
-      "Bash(npm uninstall *)"
+      "Bash(npm uninstall *)",
+      "Bash(git status *)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)"
     ]
   }
 }

@@ -114,6 +114,102 @@ describe("POST /api/attendances/mark-absent", () => {
     const json = await res.json()
     expect(json.error).toBe("Unauthorized")
   })
+
+  it("processes > BATCH_SIZE (500) active users across multiple chunks", async () => {
+    const { createClient } = await import("@/lib/supabase/server")
+    const { createAdminClient } = await import("@/lib/supabase/admin")
+
+    // Build 1100 active users (3 chunks: 500 + 500 + 100)
+    const userIds = Array.from({ length: 1100 }, (_, i) => `u-${i}`)
+
+    // Track per-table calls so we can assert chunked execution
+    const scheduleInCalls: string[][] = []
+    const existingInCalls: string[][] = []
+    const upsertCalls: { user_id: string }[][] = []
+
+    const makeChainable = (resolved: unknown) => {
+      const chain: Record<string, unknown> = {
+        then: (resolve: (v: unknown) => unknown) => Promise.resolve(resolved).then(resolve),
+      }
+      for (const m of ["select", "eq", "neq", "in", "or"]) {
+        chain[m] = vi.fn(() => chain)
+      }
+      return chain
+    }
+
+    vi.mocked(createClient).mockResolvedValue({
+      auth: {
+        getUser: vi.fn().mockResolvedValue({
+          data: { user: { email: "admin@example.com" } },
+          error: null,
+        }),
+      },
+      from: vi.fn(() => makeChainable({ data: { role: "admin" }, error: null })),
+    } as unknown as Awaited<ReturnType<typeof createClient>>)
+
+    vi.mocked(createAdminClient).mockReturnValue({
+      from: vi.fn((table: string) => {
+        if (table === "users") {
+          // Initial fetch of all active user ids
+          const chain: Record<string, unknown> = {
+            then: (resolve: (v: unknown) => unknown) =>
+              Promise.resolve({ data: userIds.map((id) => ({ id })), error: null }).then(resolve),
+            select: vi.fn(() => chain),
+            eq: vi.fn(() => chain),
+            neq: vi.fn(() => chain),
+          }
+          return chain
+        }
+        if (table === "schedules") {
+          // Capture which chunk was passed via .in()
+          const chain: Record<string, unknown> = {
+            then: (resolve: (v: unknown) => unknown) =>
+              Promise.resolve({ data: [], error: null }).then(resolve),
+            select: vi.fn(() => chain),
+            in: vi.fn((_col: string, ids: string[]) => {
+              scheduleInCalls.push(ids)
+              return chain
+            }),
+            or: vi.fn(() => chain),
+          }
+          return chain
+        }
+        if (table === "attendances") {
+          // Two distinct shapes: existing-record SELECT (chained .in) and absent UPSERT.
+          const chain: Record<string, unknown> = {
+            then: (resolve: (v: unknown) => unknown) =>
+              Promise.resolve({ data: [], error: null }).then(resolve),
+            select: vi.fn(() => chain),
+            in: vi.fn((_col: string, ids: string[]) => {
+              existingInCalls.push(ids)
+              return chain
+            }),
+            eq: vi.fn(() => chain),
+            upsert: vi.fn((rows: { user_id: string }[]) => {
+              upsertCalls.push(rows)
+              return Promise.resolve({ error: null })
+            }),
+          }
+          return chain
+        }
+        return makeChainable({ data: null, error: null })
+      }),
+    } as unknown as ReturnType<typeof createAdminClient>)
+
+    const { POST } = await import("../attendances/mark-absent/route")
+    const req = new Request("http://localhost/api/attendances/mark-absent", { method: "POST" })
+    const res = await POST(req)
+
+    expect(res.status).toBe(200)
+    // 1100 ids → chunks of 500/500/100 → 3 schedule fetches and 3 existing fetches
+    expect(scheduleInCalls.length).toBe(3)
+    expect(existingInCalls.length).toBe(3)
+    expect(scheduleInCalls[0]).toHaveLength(500)
+    expect(scheduleInCalls[1]).toHaveLength(500)
+    expect(scheduleInCalls[2]).toHaveLength(100)
+    // No schedule data → no absent rows → no upsert calls
+    expect(upsertCalls.length).toBe(0)
+  })
 })
 
 describe("POST /api/users/:id/attendances (user time-in)", () => {
@@ -629,6 +725,215 @@ describe("PATCH /api/users/:id/attendances/:attendanceId (user time-out)", () =>
     // 10:30 is 90 min after 09:00 schedule → exceeds 60 min grace → late
     expect(capturedUpdates).toMatchObject({ status: "late", time_out: "17:00" })
     await expect(res.json()).resolves.toMatchObject({ status: "late" })
+  })
+})
+
+describe("GET /api/users", () => {
+  const originalEnv = process.env.LOCAL_ADMIN_EMAIL
+
+  beforeEach(() => {
+    vi.resetModules()
+    process.env.LOCAL_ADMIN_EMAIL = "admin@example.com"
+  })
+
+  afterEach(() => {
+    process.env.LOCAL_ADMIN_EMAIL = originalEnv
+  })
+
+  // Builds a mocked Supabase client whose `from("users")` returns a chainable
+  // query that resolves to `resolved` when awaited (terminal `range()` or
+  // direct await). Captures the chain calls so tests can assert on them.
+  const makeUsersClient = (resolved: { data: unknown; error: unknown; count?: number }) => {
+    const calls: { method: string; args: unknown[] }[] = []
+    const chain: Record<string, unknown> = {
+      then: (resolve: (v: unknown) => unknown) => Promise.resolve(resolved).then(resolve),
+    }
+    for (const m of ["select", "or", "eq", "order", "range"]) {
+      chain[m] = vi.fn((...args: unknown[]) => {
+        calls.push({ method: m, args })
+        return chain
+      })
+    }
+    return { chain, calls }
+  }
+
+  it("legacy mode returns a UserRow[] array when no ?page= is given", async () => {
+    const { createClient } = await import("@/lib/supabase/server")
+    const { chain } = makeUsersClient({
+      data: [
+        {
+          id: "u1",
+          user_id: "10000001",
+          full_name: "Alice",
+          email: "alice@example.com",
+          contact_no: "09111111111",
+          position: "Dev",
+          status: "active",
+          start_date: null,
+          end_date: null,
+          role: "employee",
+          required_hours: null,
+          avatar_url: null,
+        },
+      ],
+      error: null,
+    })
+
+    vi.mocked(createClient).mockResolvedValue({
+      auth: {
+        getUser: vi
+          .fn()
+          .mockResolvedValue({ data: { user: { email: "admin@example.com" } }, error: null }),
+      },
+      from: vi.fn(() => chain),
+    } as unknown as Awaited<ReturnType<typeof createClient>>)
+
+    const { GET } = await import("../users/route")
+    const req = new Request("http://localhost/api/users")
+    const res = await GET(req)
+    expect(res.status).toBe(200)
+    const json = await res.json()
+    expect(Array.isArray(json)).toBe(true)
+    expect(json).toHaveLength(1)
+    expect(json[0]).toMatchObject({ id: "u1", fullName: "Alice", role: "employee" })
+  })
+
+  it("paginated mode returns { rows, total, page, pageSize } when ?page= is given", async () => {
+    const { createClient } = await import("@/lib/supabase/server")
+    const { chain, calls } = makeUsersClient({
+      data: [
+        {
+          id: "u2",
+          user_id: "10000002",
+          full_name: "Bob",
+          email: "bob@example.com",
+          contact_no: null,
+          position: null,
+          status: "active",
+          start_date: null,
+          end_date: null,
+          role: "employee",
+          required_hours: null,
+          avatar_url: null,
+        },
+      ],
+      error: null,
+      count: 42,
+    })
+
+    vi.mocked(createClient).mockResolvedValue({
+      auth: {
+        getUser: vi
+          .fn()
+          .mockResolvedValue({ data: { user: { email: "admin@example.com" } }, error: null }),
+      },
+      from: vi.fn(() => chain),
+    } as unknown as Awaited<ReturnType<typeof createClient>>)
+
+    const { GET } = await import("../users/route")
+    const req = new Request("http://localhost/api/users?page=2&pageSize=10&search=bo&role=employee")
+    const res = await GET(req)
+    expect(res.status).toBe(200)
+    const json = await res.json()
+    expect(json).toMatchObject({ total: 42, page: 2, pageSize: 10 })
+    expect(Array.isArray(json.rows)).toBe(true)
+    expect(json.rows[0]).toMatchObject({ id: "u2", fullName: "Bob" })
+    // page=2 with pageSize=10 → range(10, 19)
+    const rangeCall = calls.find((c) => c.method === "range")
+    expect(rangeCall?.args).toEqual([10, 19])
+    // search and role filters were applied
+    expect(calls.some((c) => c.method === "or")).toBe(true)
+    expect(calls.some((c) => c.method === "eq" && c.args[0] === "role")).toBe(true)
+  })
+})
+
+describe("GET /api/schedules/summaries", () => {
+  const originalEnv = process.env.LOCAL_ADMIN_EMAIL
+
+  beforeEach(() => {
+    vi.resetModules()
+    process.env.LOCAL_ADMIN_EMAIL = "admin@example.com"
+  })
+
+  afterEach(() => {
+    process.env.LOCAL_ADMIN_EMAIL = originalEnv
+  })
+
+  const makeChainable = (resolved: unknown) => {
+    const chain: Record<string, unknown> = {
+      then: (resolve: (v: unknown) => unknown) => Promise.resolve(resolved).then(resolve),
+    }
+    for (const m of ["select", "neq", "in", "or", "order", "range"]) {
+      chain[m] = vi.fn(() => chain)
+    }
+    return chain
+  }
+
+  it("legacy mode returns a plain array when no ?page= is given", async () => {
+    const { createClient } = await import("@/lib/supabase/server")
+
+    vi.mocked(createClient).mockResolvedValue({
+      auth: {
+        getUser: vi.fn().mockResolvedValue({
+          data: { user: { email: "admin@example.com" } },
+          error: null,
+        }),
+      },
+      from: vi.fn((table: string) => {
+        if (table === "users") return makeChainable({ data: [{ id: "u1" }], error: null })
+        if (table === "schedules") return makeChainable({ data: [], error: null })
+        if (table === "user_schedule_defaults") return makeChainable({ data: [], error: null })
+        return makeChainable({ data: null, error: null })
+      }),
+    } as unknown as Awaited<ReturnType<typeof createClient>>)
+
+    const { GET } = await import("../schedules/summaries/route")
+    const req = new Request("http://localhost/api/schedules/summaries")
+    const res = await GET(req)
+    expect(res.status).toBe(200)
+    const json = await res.json()
+    expect(Array.isArray(json)).toBe(true)
+    expect(json[0]).toMatchObject({ userId: "u1", hasSchedule: false })
+  })
+
+  it("paginated mode returns { rows, total, page, pageSize } when ?page= is given", async () => {
+    const { createClient } = await import("@/lib/supabase/server")
+
+    const rangeCalls: [number, number][] = []
+    const usersChain: Record<string, unknown> = {
+      then: (resolve: (v: unknown) => unknown) =>
+        Promise.resolve({ data: [{ id: "u2" }], error: null, count: 87 }).then(resolve),
+    }
+    for (const m of ["select", "neq", "or", "order"]) usersChain[m] = vi.fn(() => usersChain)
+    usersChain["range"] = vi.fn((from: number, to: number) => {
+      rangeCalls.push([from, to])
+      return usersChain
+    })
+
+    vi.mocked(createClient).mockResolvedValue({
+      auth: {
+        getUser: vi.fn().mockResolvedValue({
+          data: { user: { email: "admin@example.com" } },
+          error: null,
+        }),
+      },
+      from: vi.fn((table: string) => {
+        if (table === "users") return usersChain
+        if (table === "schedules") return makeChainable({ data: [], error: null })
+        if (table === "user_schedule_defaults") return makeChainable({ data: [], error: null })
+        return makeChainable({ data: null, error: null })
+      }),
+    } as unknown as Awaited<ReturnType<typeof createClient>>)
+
+    const { GET } = await import("../schedules/summaries/route")
+    const req = new Request("http://localhost/api/schedules/summaries?page=3&pageSize=20&search=alice")
+    const res = await GET(req)
+    expect(res.status).toBe(200)
+    const json = await res.json()
+    expect(json).toMatchObject({ total: 87, page: 3, pageSize: 20 })
+    expect(Array.isArray(json.rows)).toBe(true)
+    // page=3 with pageSize=20 → range(40, 59)
+    expect(rangeCalls[0]).toEqual([40, 59])
   })
 })
 

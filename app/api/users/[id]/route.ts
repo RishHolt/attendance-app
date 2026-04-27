@@ -95,32 +95,29 @@ export async function PATCH(
         .single()
       if (existingUser?.email) {
         const admin = createAdminClient()
-        const { data: listData } = await admin.auth.admin.listUsers({
-          page: 1,
-          perPage: 1000,
-        })
-        const authUser = listData.users.find(
-          (u) => u.email?.toLowerCase() === existingUser.email.toLowerCase()
+        // public.users.id is set to auth.users.id at creation time (see POST in users/route.ts),
+        // so try updating the auth user by id directly. If the auth user doesn't exist
+        // (legacy user created without a password), fall through and create one.
+        const { error: updateAuthError } = await admin.auth.admin.updateUserById(
+          id,
+          { password: body.password.trim() }
         )
-        if (authUser) {
-          const { error: authError } = await admin.auth.admin.updateUserById(
-            authUser.id,
-            { password: body.password.trim() }
-          )
-          if (authError) {
+        if (updateAuthError) {
+          const notFound = (updateAuthError.status ?? 0) === 404 ||
+            updateAuthError.message?.toLowerCase().includes("not found") ||
+            updateAuthError.message?.toLowerCase().includes("user_not_found")
+          if (!notFound) {
             return NextResponse.json(
-              { error: authError.message ?? "Failed to update password" },
+              { error: updateAuthError.message ?? "Failed to update password" },
               { status: 500 }
             )
           }
-        } else {
-          const { data: createdAuth, error: createError } =
-            await admin.auth.admin.createUser({
-              email: existingUser.email,
-              password: body.password.trim(),
-              email_confirm: true,
-              user_metadata: { full_name: existingUser.full_name },
-            })
+          const { error: createError } = await admin.auth.admin.createUser({
+            email: existingUser.email,
+            password: body.password.trim(),
+            email_confirm: true,
+            user_metadata: { full_name: existingUser.full_name },
+          })
           if (createError) {
             return NextResponse.json(
               { error: createError.message ?? "Failed to create auth user" },
